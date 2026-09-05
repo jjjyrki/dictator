@@ -7,7 +7,9 @@ The documentation records the product boundary, technical decisions, model work,
 - [Specifications](specifications/README.md) contains the product and engineering contract.
 - [Reference project review](reference/moshi-android.md) records the relevant findings from `LaurentMazare/moshi-android`.
 - [Overlay stub prototype](decisions/2026-09-04-overlay-stub.md) records the temporary Accessibility harness.
-- [Rust STT runtime](decisions/2026-09-05-stt-runtime.md) records the S23 runtime, model files, and Q8 decision.
+- [Rust STT runtime](decisions/2026-09-05-stt-runtime.md) records the superseded Kyutai Q8 attempt and its S23 result.
+- [sherpa-onnx runtime](decisions/2026-09-05-sherpa-onnx-runtime.md) records the superseded Zipformer attempt (fast, inaccurate).
+- [Whisper runtime](decisions/2026-09-05-whisper-runtime.md) records the current whisper.cpp + FUTO ACFT setup.
 - `benchmarks/` will contain reproducible Android performance reports and optional model compatibility fixtures.
 - `tasks/` may contain implementation slices after the feasibility gates in the main specification pass.
 

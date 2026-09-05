@@ -15,3 +15,6 @@
 *.ap_
 *.dex
 .cxx/
+
+/native/build-host/
+/native/build-android-arm64/

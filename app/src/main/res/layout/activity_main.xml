@@ -35,6 +35,52 @@
             android:textColor="@color/setup_text"
             android:textSize="16sp" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/model_selector_title"
+            android:textColor="@color/setup_text"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <RadioGroup
+            android:id="@+id/modelSelector"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#1AFFFFFF"
+            android:padding="12dp">
+
+            <RadioButton
+                android:id="@+id/modelTiny"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="40dp"
+                android:text="@string/model_tiny"
+                android:textColor="@color/setup_text"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/modelBase"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:minHeight="40dp"
+                android:text="@string/model_base"
+                android:textColor="@color/setup_text"
+                android:textSize="16sp" />
+
+            <RadioButton
+                android:id="@+id/modelSmall"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="40dp"
+                android:text="@string/model_small"
+                android:textColor="@color/setup_text"
+                android:textSize="16sp" />
+        </RadioGroup>
+
         <Button
             android:id="@+id/installModel"
             android:layout_width="match_parent"

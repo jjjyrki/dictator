@@ -1,6 +1,7 @@
 # Rust STT runtime and Q8 model bundle
 
 Date: 2026-09-05
+Superseded: 2026-09-05. The Kyutai Q8 bundle reached RTF 2.24 on the Galaxy S23, far above the real-time gate. Replaced by sherpa-onnx with a streaming English Zipformer int8 model (about 73 MB). See [the sherpa-onnx decision](2026-09-05-sherpa-onnx-runtime.md).
 
 Dictator transcribes speech only. It has no TTS or spoken output.
 

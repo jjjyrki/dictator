@@ -1,14 +1,15 @@
 package io.jyri.dictator.model
 
 import android.content.Context
+import io.jyri.dictator.model.SttModelVariant
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-class SttModelInstaller(context: Context) {
-    private val modelDirectory = File(context.filesDir, "models/stt-1b-en_fr-q8")
+class SttModelInstaller(context: Context, private val variant: SttModelVariant) {
+    private val modelDirectory = File(context.filesDir, "models/${variant.directoryName}")
 
     fun directory(): File = modelDirectory
 
@@ -18,6 +19,10 @@ class SttModelInstaller(context: Context) {
 
     fun install(onProgress: (Progress) -> Unit) {
         modelDirectory.mkdirs()
+        val expected = assets.map { it.fileName }.toSet()
+        modelDirectory.listFiles()?.forEach { file ->
+            if (file.isFile && file.name !in expected) file.delete()
+        }
         assets.forEachIndexed { index, asset ->
             val destination = File(modelDirectory, asset.fileName)
             if (destination.length() == asset.sizeBytes && sha256(destination) == asset.sha256) {
@@ -38,7 +43,7 @@ class SttModelInstaller(context: Context) {
             connectTimeout = CONNECT_TIMEOUT_MS
             readTimeout = READ_TIMEOUT_MS
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "Dictator/0.1")
+            setRequestProperty("User-Agent", "Dictator/0.2")
             if (existingBytes > 0) setRequestProperty("Range", "bytes=$existingBytes-")
         }
         try {
@@ -93,6 +98,15 @@ class SttModelInstaller(context: Context) {
         val totalBytes: Long,
     )
 
+    private val assets = listOf(
+        Asset(
+            fileName = variant.fileName,
+            sizeBytes = variant.sizeBytes,
+            sha256 = variant.sha256,
+            url = "${variant.downloadUrl}",
+        ),
+    )
+
     private data class Asset(
         val fileName: String,
         val sizeBytes: Long,
@@ -105,34 +119,6 @@ class SttModelInstaller(context: Context) {
         const val CONNECT_TIMEOUT_MS = 30_000
         const val READ_TIMEOUT_MS = 30_000
 
-        const val OFFICIAL_REVISION = "095e38f6242006a93c2541149b181988397f5c7c"
-        const val QUANTIZED_REVISION = "177aac749e0afc58d20dc5ec20814ef7b766a1d2"
-
-        val assets = listOf(
-            Asset(
-                fileName = "model.q8_0.gguf",
-                sizeBytes = 1_051_290_688,
-                sha256 = "7bbceaf823610ba1d33bc6b1218105ade3ebd02177a3234f3950e0ca5e7c5c0c",
-                url = "https://huggingface.co/stephvax/kyutai-stt-1b-en_fr-candle-gguf/resolve/$QUANTIZED_REVISION/model.q8_0.gguf?download=true",
-            ),
-            Asset(
-                fileName = "mimi-pytorch-e351c8d8@125.safetensors",
-                sizeBytes = 384_644_900,
-                sha256 = "09b782f0629851a271227fb9d36db65c041790365f11bbe5d3d59369cf863f50",
-                url = "https://huggingface.co/kyutai/stt-1b-en_fr-candle/resolve/$OFFICIAL_REVISION/mimi-pytorch-e351c8d8%40125.safetensors?download=true",
-            ),
-            Asset(
-                fileName = "config.json",
-                sizeBytes = 1_315,
-                sha256 = "a3f1c6f7a39fca1fb1bbff68eaabc560b8037d2cdc68aa1f489859949a4223de",
-                url = "https://huggingface.co/kyutai/stt-1b-en_fr-candle/resolve/$OFFICIAL_REVISION/config.json?download=true",
-            ),
-            Asset(
-                fileName = "tokenizer_en_fr_audio_8000.model",
-                sizeBytes = 120_378,
-                sha256 = "cd87dd5d17169151782ac700280ec057e5d658a9afbe238a048ea5ff318cce69",
-                url = "https://huggingface.co/kyutai/stt-1b-en_fr-candle/resolve/$OFFICIAL_REVISION/tokenizer_en_fr_audio_8000.model?download=true",
-            ),
-        )
+        const val MODEL_BASE_URL = "https://voiceinput.futo.org/VoiceInput"
     }
 }

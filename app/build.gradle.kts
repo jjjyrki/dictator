@@ -12,8 +12,8 @@ android {
         applicationId = "io.jyri.dictator"
         minSdk = 34
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 7
+        versionName = "0.5.1"
     }
 
     buildTypes {

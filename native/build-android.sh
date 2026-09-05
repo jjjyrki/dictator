@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
+# Builds the whisper.cpp JNI runtime for arm64-v8a and packages it into the
+# app's jniLibs. Usage: native/build-android.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export PATH="$HOME/.cargo/bin:$PATH"
-if ! command -v cargo >/dev/null 2>&1; then
-  RUST_TOOLCHAIN_BIN="$(find "$HOME/.rustup/toolchains" -mindepth 1 -maxdepth 1 -type d -name 'stable-*' | head -n 1)/bin"
-  export PATH="$RUST_TOOLCHAIN_BIN:$PATH"
-fi
-
 SDK_ROOT="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 NDK_ROOT="${ANDROID_NDK_HOME:-}"
 
@@ -19,21 +15,28 @@ if [[ ! -d "$NDK_ROOT" ]]; then
   echo "Android NDK not found. Set ANDROID_NDK_HOME." >&2
   exit 1
 fi
-if ! command -v cargo >/dev/null 2>&1 || ! cargo ndk --version >/dev/null 2>&1; then
-  echo "Rust and cargo-ndk are required. Install them before building native code." >&2
-  exit 1
-fi
 
-PREBUILT="$(find "$NDK_ROOT/toolchains/llvm/prebuilt" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 JNI_LIBS="$ROOT/app/src/main/jniLibs/arm64-v8a"
+BUILD_DIR="$ROOT/native/build-android-arm64"
 
-export ANDROID_NDK_HOME="$NDK_ROOT"
-export ANDROID_NDK_ROOT="$NDK_ROOT"
-export ANDROID_NDK="$NDK_ROOT"
-export CMAKE_ANDROID_NDK="$NDK_ROOT"
+cmake -S "$ROOT/native" -B "$BUILD_DIR" \
+  -DCMAKE_TOOLCHAIN_FILE="$NDK_ROOT/build/cmake/android.toolchain.cmake" \
+  -DANDROID_ABI=arm64-v8a \
+  -DANDROID_PLATFORM=android-34 \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_FLAGS='-march=armv8.2-a+dotprod+i8mm' \
+  -DCMAKE_CXX_FLAGS='-march=armv8.2-a+dotprod+i8mm' \
+  -DGGML_NATIVE=OFF \
+  -DGGML_BACKEND_DL=OFF \
+  -DGGML_CPU_ALL_VARIANTS=OFF \
+  -DGGML_BLAS=OFF \
+  -DGGML_METAL=OFF \
+  -DGGML_OPENMP=OFF \
+  -DGGML_CPU_AARCH64=ON \
+  -DBUILD_SHARED_LIBS=OFF
+cmake --build "$BUILD_DIR" --parallel "$(sysctl -n hw.ncpu)" --target dictator_whisper
 
 mkdir -p "$JNI_LIBS"
-cd "$ROOT/native"
-cargo ndk -t arm64-v8a -o "$ROOT/app/src/main/jniLibs" build --release
-"$PREBUILT/bin/llvm-strip" --strip-unneeded "$JNI_LIBS/libdictator_stt.so"
-cp "$PREBUILT/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" "$JNI_LIBS/"
+cp "$BUILD_DIR/libdictator_whisper.so" "$JNI_LIBS/"
+STRIP="$(find "$NDK_ROOT/toolchains/llvm/prebuilt" -path '*bin/llvm-strip' | head -n 1)"
+"$STRIP" --strip-unneeded "$JNI_LIBS/libdictator_whisper.so"

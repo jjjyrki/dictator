@@ -3,7 +3,7 @@ package io.jyri.dictator.audio
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import io.jyri.dictator.speech.NativeSttBridge
+import io.jyri.dictator.speech.WhisperSttEngine
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -11,8 +11,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 class LiveSttRecorder(
-    private val nativeHandle: Long,
-    private val onPartial: (String) -> Unit,
+    private val engine: WhisperSttEngine,
 ) {
     private val recording = AtomicBoolean(false)
     private val captureFinished = AtomicBoolean(false)
@@ -26,7 +25,7 @@ class LiveSttRecorder(
     private lateinit var inferenceThread: Thread
 
     fun start() {
-        measureInference { NativeSttBridge.nativeStart(nativeHandle) }
+        measureInference { engine.start() }
         recording.set(true)
         captureThread = Thread(::capture, "dictator-audio-capture").also { it.start() }
         inferenceThread = Thread(::infer, "dictator-stt-inference").also { it.start() }
@@ -37,7 +36,7 @@ class LiveSttRecorder(
         captureThread.join()
         inferenceThread.join()
         failure.get()?.let { throw it }
-        val transcript = measureInference { NativeSttBridge.nativeFinish(nativeHandle) }
+        val transcript = measureInference { engine.finish() }
         return Result(
             transcript = transcript,
             audioSeconds = capturedSamples.get().toDouble() / SAMPLE_RATE_HZ,
@@ -67,7 +66,7 @@ class LiveSttRecorder(
             .setBufferSizeInBytes(bufferSize)
             .build()
         try {
-            check(recorder.state == AudioRecord.STATE_INITIALIZED) { "Could not open microphone at 24 kHz" }
+            check(recorder.state == AudioRecord.STATE_INITIALIZED) { "Could not open microphone at $SAMPLE_RATE_HZ Hz" }
             recorder.startRecording()
             val pcm16 = ShortArray(FRAME_SAMPLES)
             while (recording.get()) {
@@ -94,8 +93,8 @@ class LiveSttRecorder(
         try {
             while (!captureFinished.get() || frames.isNotEmpty()) {
                 val frame = frames.poll(POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS) ?: continue
-                val partial = measureInference { NativeSttBridge.nativeFeed(nativeHandle, frame) }
-                onPartial(partial)
+                // Whisper transcribes once at finish; there are no partials yet.
+                measureInference { engine.feed(frame) }
             }
         } catch (error: Throwable) {
             failure.compareAndSet(null, error)
@@ -123,8 +122,8 @@ class LiveSttRecorder(
     }
 
     private companion object {
-        const val SAMPLE_RATE_HZ = 24_000
-        const val FRAME_SAMPLES = 1_920
+        const val SAMPLE_RATE_HZ = WhisperSttEngine.SAMPLE_RATE_HZ
+        const val FRAME_SAMPLES = 1_600
         const val BYTES_PER_PCM16 = 2
         const val MAX_QUEUED_FRAMES = 8
         const val POLL_TIMEOUT_MS = 100L

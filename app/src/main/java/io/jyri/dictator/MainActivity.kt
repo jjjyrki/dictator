@@ -8,12 +8,17 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.View
 import android.view.accessibility.AccessibilityManager
 import android.widget.Button
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import io.jyri.dictator.audio.LiveSttRecorder
 import io.jyri.dictator.model.SttModelInstaller
-import io.jyri.dictator.speech.NativeSttBridge
+import io.jyri.dictator.model.SttModelVariant
+import io.jyri.dictator.speech.WhisperSttEngine
+import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -26,18 +31,32 @@ class MainActivity : android.app.Activity() {
     private lateinit var transcript: TextView
     private lateinit var recordButton: Button
     private lateinit var loadModelButton: Button
+    private lateinit var modelSelector: RadioGroup
 
-    private var nativeHandle = 0L
+    private var selectedVariant: SttModelVariant = SttModelVariant.BASE
+    private var engine: WhisperSttEngine? = null
     private var recorder: LiveSttRecorder? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        modelInstaller = SttModelInstaller(this)
         modelStatus = findViewById(R.id.modelStatus)
         transcript = findViewById(R.id.transcript)
         recordButton = findViewById(R.id.record)
         loadModelButton = findViewById(R.id.loadModel)
+        modelSelector = findViewById(R.id.modelSelector)
+        modelSelector.setOnCheckedChangeListener { _, checkedId ->
+            val variant = when (checkedId) {
+                R.id.modelTiny -> SttModelVariant.TINY
+                R.id.modelSmall -> SttModelVariant.SMALL
+                else -> SttModelVariant.BASE
+            }
+            if (variant != selectedVariant) {
+                selectedVariant = variant
+                updateModelControls()
+            }
+        }
+        modelInstaller = SttModelInstaller(this, selectedVariant)
 
         findViewById<Button>(R.id.openAccessibility).setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -64,11 +83,8 @@ class MainActivity : android.app.Activity() {
         recorder?.let { active ->
             background.execute { runCatching { active.stopAndFinish() } }
         }
-        if (nativeHandle != 0L) {
-            val handle = nativeHandle
-            nativeHandle = 0L
-            background.execute { NativeSttBridge.nativeClose(handle) }
-        }
+        engine?.close()
+        engine = null
         background.shutdown()
         super.onDestroy()
     }
@@ -76,6 +92,7 @@ class MainActivity : android.app.Activity() {
     private fun installModel() {
         findViewById<Button>(R.id.installModel).isEnabled = false
         loadModelButton.isEnabled = false
+        modelSelector.isEnabled = false
         setModelStatus(getString(R.string.model_installing))
         background.execute {
             runCatching {
@@ -110,17 +127,14 @@ class MainActivity : android.app.Activity() {
     private fun loadModel() {
         loadModelButton.isEnabled = false
         setModelStatus(getString(R.string.model_loading))
+        val modelFile = File(modelInstaller.directory(), selectedVariant.fileName)
         background.execute {
             runCatching {
-                NativeSttBridge.nativeCreate(modelInstaller.directory().absolutePath)
-            }.onSuccess { handle ->
+                WhisperSttEngine(modelFile)
+            }.onSuccess { created ->
+                engine = created
                 mainHandler.post {
-                    if (handle == 0L) {
-                        setModelStatus(getString(R.string.model_error, "Native engine did not start"))
-                    } else {
-                        nativeHandle = handle
-                        setModelStatus(getString(R.string.model_ready))
-                    }
+                    setModelStatus(getString(R.string.model_ready))
                     updateModelControls()
                 }
             }.onFailure { error ->
@@ -146,14 +160,12 @@ class MainActivity : android.app.Activity() {
     }
 
     private fun startRecording() {
-        check(nativeHandle != 0L) { "The STT model is not loaded" }
+        check(engine != null) { "The STT model is not loaded" }
         recordButton.isEnabled = false
         recordButton.setText(R.string.stop_recording)
         transcript.text = ""
         setModelStatus(getString(R.string.recording_starting))
-        val active = LiveSttRecorder(nativeHandle) { partial ->
-            mainHandler.post { transcript.text = partial }
-        }
+        val active = LiveSttRecorder(checkNotNull(engine))
         recorder = active
         background.execute {
             runCatching { active.start() }.onSuccess {
@@ -214,11 +226,13 @@ class MainActivity : android.app.Activity() {
     }
 
     private fun updateModelControls() {
+        modelInstaller = SttModelInstaller(this, selectedVariant)
         val installed = modelInstaller.isInstalled()
-        findViewById<Button>(R.id.installModel).isEnabled = nativeHandle == 0L
-        loadModelButton.isEnabled = installed && nativeHandle == 0L
-        recordButton.isEnabled = nativeHandle != 0L && recorder == null
-        if (nativeHandle == 0L) {
+        findViewById<Button>(R.id.installModel).isEnabled = engine == null
+        loadModelButton.isEnabled = installed && engine == null
+        recordButton.isEnabled = engine != null && recorder == null
+        modelSelector.isEnabled = engine == null && recorder == null
+        if (engine == null) {
             setModelStatus(
                 getString(if (installed) R.string.model_installed else R.string.model_not_installed),
             )

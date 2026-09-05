@@ -2,7 +2,7 @@
 
 Dictator is a personal, sideloaded Android dictation assistant. It puts a small microphone bubble above editable text fields, transcribes speech on the device, and inserts the result without replacing the user's keyboard.
 
-The product question is whether Kyutai's `stt-1b-en_fr` model can transcribe live microphone audio faster than real time on the target Samsung Galaxy S23. The current APK contains the Rust/JNI speech prototype. The Accessibility overlay remains a separate stub until that test passes.
+The product question is whether on-device English dictation can transcribe faster than real time with good quality on the target Samsung Galaxy S23. The current APK uses the whisper.cpp runtime with a FUTO ACFT fine-tuned Whisper model. The Accessibility overlay remains a separate stub until that test passes.
 
 ## Start here
 
@@ -18,11 +18,11 @@ The product question is whether Kyutai's `stt-1b-en_fr` model can transcribe liv
 4. Add the accessibility service, overlay, and text insertion.
 5. Polish only after the core workflow works.
 
-The desktop baseline is skipped. The product path is Moshi/Kyutai inspection, then Android speech, then overlay. The current app contains both the STT spike and the temporary overlay harness, but the harness must not be treated as a product test until STT passes.
+The desktop baseline is skipped. The product path is runtime selection, then Android speech, then overlay. The current app contains both the STT spike and the temporary overlay harness, but the harness must not be treated as a product test until STT passes.
 
 ## Sideload the STT prototype
 
-Target: Android 14, `arm64-v8a` on the Galaxy S23. The APK includes Rust, Candle, Mimi, and the Kyutai STT decoder. It downloads the 1.44 GB Q8 model bundle on first setup. The model stays in app-private storage and works offline after installation.
+Target: Android 14+, `arm64-v8a` on the Galaxy S23. The APK includes the whisper.cpp JNI runtime. It downloads the 78 MB FUTO ACFT Whisper model on first setup. The model stays in app-private storage and works offline after installation.
 
 ```sh
 export ANDROID_HOME="$HOME/Library/Android/sdk"

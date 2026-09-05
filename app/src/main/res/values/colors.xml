@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="setup_bg">#111111</color>
+    <color name="setup_text">#F2F2F2</color>
+    <color name="setup_muted">#B3B3B3</color>
+    <color name="setup_ok">#7DCEA0</color>
+    <color name="setup_warn">#F5B041</color>
+    <color name="bubble_idle">#1F4E79</color>
+    <color name="bubble_recording">#922B21</color>
+    <color name="bubble_processing">#7D6608</color>
+    <color name="bubble_done">#196F3D</color>
+    <color name="bubble_error">#6C3483</color>
+    <color name="bubble_text">#FFFFFF</color>
+</resources>

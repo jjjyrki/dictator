@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dictator</string>
+    <string name="accessibility_service_label">Dictator overlay</string>
+    <string name="accessibility_service_description">Shows a microphone bubble over editable fields and inserts dictated text. It does not replace the keyboard.</string>
+    <string name="setup_title">On-device STT prototype</string>
+    <string name="setup_body">Install the Q8 speech model once, load it into memory, then record a short English test. The transcript stays on this phone. The overlay still uses a stub until this engine passes the S23 speed test.</string>
+    <string name="model_installing">Installing model files…</string>
+    <string name="model_install_progress">%1$d/%2$d: %3$s, %4$d MiB of %5$d MiB</string>
+    <string name="model_not_installed">Install the Q8 model on Wi-Fi before recording.</string>
+    <string name="model_installed">Model installed. Load it before recording.</string>
+    <string name="model_loading">Loading the Q8 model into memory…</string>
+    <string name="model_ready">Model loaded. Ready to record.</string>
+    <string name="model_error">Model error: %1$s</string>
+    <string name="install_model">Install Q8 model (about 1.44 GB)</string>
+    <string name="load_model">Load model</string>
+    <string name="start_recording">Start recording</string>
+    <string name="stop_recording">Stop and transcribe</string>
+    <string name="recording_starting">Starting microphone…</string>
+    <string name="recording">Recording. Tap Stop when finished.</string>
+    <string name="finalizing">Finalizing transcript…</string>
+    <string name="recording_complete">Audio %1$.1fs, inference %2$.1fs, RTF %3$.2f, dropped frames %4$d</string>
+    <string name="accessibility_enabled">Accessibility service is on</string>
+    <string name="accessibility_disabled">Accessibility service is off</string>
+    <string name="open_accessibility_settings">Open Accessibility settings</string>
+    <string name="bubble_idle">Dictate</string>
+    <string name="bubble_recording">Recording</string>
+    <string name="bubble_processing">Inserting</string>
+    <string name="bubble_done">Done</string>
+    <string name="bubble_error">Insert failed</string>
+</resources>

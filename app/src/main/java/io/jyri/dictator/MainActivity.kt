@@ -2,24 +2,29 @@ package io.jyri.dictator
 
 import android.Manifest
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.View
 import android.view.accessibility.AccessibilityManager
 import android.widget.Button
 import android.widget.PopupMenu
 import android.widget.TextView
+import android.widget.Toast
 import io.jyri.dictator.audio.LiveSttRecorder
 import io.jyri.dictator.insert.InsertMode
-import io.jyri.dictator.model.FinnishSetting
+import io.jyri.dictator.model.LanguageSelection
 import io.jyri.dictator.model.ModelSelection
+import io.jyri.dictator.model.SpokenLanguage
 import io.jyri.dictator.model.SttModelInstaller
-import io.jyri.dictator.model.SttModelVariant
+import io.jyri.dictator.model.SttModelProfile
 import io.jyri.dictator.speech.PartialsSetting
 import io.jyri.dictator.speech.SttEngineHolder
+import io.jyri.dictator.speech.WhisperLanguageConfig
 import io.jyri.dictator.speech.WhisperSttEngine
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -36,9 +41,9 @@ class MainActivity : android.app.Activity() {
     private lateinit var recordButton: Button
     private lateinit var installModelButton: Button
     private lateinit var modelMenuButton: Button
-    private lateinit var finnishToggle: Button
+    private lateinit var languageMenuButton: Button
 
-    private var selectedVariant: SttModelVariant = SttModelVariant.SMALL
+    private var selectedModel: SttModelProfile = SttModelProfile.default
     private var engine: WhisperSttEngine? = null
     private var recorder: LiveSttRecorder? = null
     private var modelInstallationInProgress = false
@@ -46,7 +51,7 @@ class MainActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        selectedVariant = ModelSelection.load(this)
+        selectedModel = ModelSelection.load(this)
         setContentView(R.layout.activity_main)
         modelStatus = findViewById(R.id.modelStatus)
         selectedModelLabel = findViewById(R.id.selectedModel)
@@ -55,12 +60,13 @@ class MainActivity : android.app.Activity() {
         recordButton = findViewById(R.id.record)
         installModelButton = findViewById(R.id.installModel)
         modelMenuButton = findViewById(R.id.modelMenu)
-        finnishToggle = findViewById(R.id.toggleFinnish)
+        languageMenuButton = findViewById(R.id.languageMenu)
         modelInstaller = installerFor()
 
         modelMenuButton.setOnClickListener { showModelMenu() }
+        languageMenuButton.setOnClickListener { showLanguageDialog() }
         findViewById<Button>(R.id.openAccessibility).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            showAccessibilityDisclosure()
         }
         installModelButton.setOnClickListener { installModel() }
         val toggleInsertMode = findViewById<Button>(R.id.toggleInsertMode)
@@ -87,13 +93,6 @@ class MainActivity : android.app.Activity() {
             refreshPartialsLabel()
         }
         refreshPartialsLabel()
-        val refreshFinnishLabel = {
-            finnishToggle.setText(
-                if (finnishEnabled()) R.string.finnish_on else R.string.finnish_off,
-            )
-        }
-        finnishToggle.setOnClickListener { toggleFinnish() }
-        refreshFinnishLabel()
         recordButton.setOnClickListener { toggleRecording() }
         ensureEngineLoaded()
         updateModelControls()
@@ -130,7 +129,7 @@ class MainActivity : android.app.Activity() {
         modelInstallationInProgress = true
         installModelButton.isEnabled = false
         modelMenuButton.isEnabled = false
-        finnishToggle.isEnabled = false
+        languageMenuButton.isEnabled = false
         setModelStatus(getString(R.string.model_installing))
         val installer = modelInstaller
         background.execute {
@@ -167,9 +166,9 @@ class MainActivity : android.app.Activity() {
 
     /** Loads the persisted model, or reuses the process-wide engine if it matches. */
     private fun ensureEngineLoaded() {
-        val finnish = finnishEnabled()
+        val languages = activeLanguages()
         val shared = SttEngineHolder.engine
-        if (shared != null && SttEngineHolder.matches(selectedVariant, finnish)) {
+        if (shared != null && SttEngineHolder.matches(selectedModel, languages)) {
             engine = shared
             return
         }
@@ -181,9 +180,9 @@ class MainActivity : android.app.Activity() {
 
     private fun loadSelectedModel() {
         if (modelLoadingInProgress) return
-        val variant = selectedVariant
-        val finnish = finnishEnabled()
-        val installer = installerFor(variant)
+        val model = selectedModel
+        val languages = activeLanguages()
+        val installer = installerFor(model)
         modelInstaller = installer
         if (!installer.isInstalled()) {
             updateModelControls()
@@ -194,18 +193,21 @@ class MainActivity : android.app.Activity() {
         setModelStatus(getString(R.string.model_loading))
         background.execute {
             runCatching {
-                WhisperSttEngine(installer.modelFile(), installer.language())
+                WhisperSttEngine(
+                    installer.modelFile(),
+                    WhisperLanguageConfig.forModel(model, languages),
+                )
             }.onSuccess { created ->
                 mainHandler.post {
                     // Model choices are disabled while loading, but avoid
                     // installing a stale result if the Activity is recreated.
-                    if (selectedVariant != variant || finnishEnabled() != finnish) {
+                    if (selectedModel != model || activeLanguages() != languages) {
                         modelLoadingInProgress = false
                         created.close()
                         updateModelControls()
                         return@post
                     }
-                    SttEngineHolder.install(variant, finnish, created)
+                    SttEngineHolder.install(model, languages, created)
                     engine = created
                     modelLoadingInProgress = false
                     setModelStatus(getString(R.string.model_ready))
@@ -224,47 +226,68 @@ class MainActivity : android.app.Activity() {
     private fun showModelMenu() {
         val popup = PopupMenu(this, modelMenuButton)
         popup.menuInflater.inflate(R.menu.model_menu, popup.menu)
-        val finnish = finnishEnabled()
-        modelMenuItems().forEach { (variant, itemId) ->
+        modelMenuItems().forEach { (model, itemId) ->
             val item = popup.menu.findItem(itemId)
-            item.isChecked = variant == selectedVariant
-            val asset = variant.asset(finnish)
-            val installed = SttModelInstaller(this, variant, finnish).isInstalled()
+            item.isChecked = model == selectedModel
+            val installed = SttModelInstaller(this, model.asset).isInstalled()
             item.title = getString(
                 if (installed) R.string.model_menu_installed else R.string.model_menu_not_installed,
-                asset.displayName,
+                model.displayName,
             )
         }
         popup.setOnMenuItemClickListener { item ->
-            val variant = modelMenuItems().firstOrNull { it.second == item.itemId }?.first
+            val model = modelMenuItems().firstOrNull { it.second == item.itemId }?.first
                 ?: return@setOnMenuItemClickListener false
             item.isChecked = true
-            selectModel(variant)
+            selectModel(model)
             true
         }
         popup.show()
     }
 
-    private fun selectModel(variant: SttModelVariant) {
-        if (variant == selectedVariant || modelInstallationInProgress || modelLoadingInProgress || recorder != null) {
+    private fun showLanguageDialog() {
+        if (!selectedModel.isMultilingual || modelInstallationInProgress || modelLoadingInProgress || recorder != null) {
             return
         }
-        selectedVariant = variant
-        ModelSelection.store(this, variant)
-        unloadCurrentEngine()
-        val installer = installerFor(variant)
-        if (installer.isInstalled()) {
-            loadSelectedModel()
-        } else {
-            updateModelControls()
+        val selected = activeLanguages().toMutableSet()
+        val languages = SpokenLanguage.entries
+        val labels = languages.map(::languageLabel).toTypedArray()
+        val checked = languages.map { it in selected }.toBooleanArray()
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.language_selection_title)
+            .setMessage(R.string.language_selection_body)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                val language = languages[which]
+                if (isChecked) selected += language else selected -= language
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.done, null)
+            .create()
+        dialog.setOnShowListener {
+            val done = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            done.isEnabled = selected.isNotEmpty()
+            done.setOnClickListener {
+                if (selected.isEmpty()) {
+                    Toast.makeText(this, R.string.language_selection_requires_one, Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                LanguageSelection.store(this, selected)
+                unloadCurrentEngine()
+                if (modelInstaller.isInstalled()) loadSelectedModel() else updateModelControls()
+                dialog.dismiss()
+            }
         }
+        dialog.show()
     }
 
-    private fun toggleFinnish() {
-        if (modelInstallationInProgress || modelLoadingInProgress || recorder != null) return
-        FinnishSetting.store(this, !finnishEnabled())
+    private fun selectModel(model: SttModelProfile) {
+        if (model == selectedModel || modelInstallationInProgress || modelLoadingInProgress || recorder != null) {
+            return
+        }
+        selectedModel = model
+        ModelSelection.store(this, model)
         unloadCurrentEngine()
-        val installer = installerFor()
+        val installer = installerFor(model)
         if (installer.isInstalled()) {
             loadSelectedModel()
         } else {
@@ -280,17 +303,20 @@ class MainActivity : android.app.Activity() {
         engine = null
     }
 
-    private fun modelMenuItems(): List<Pair<SttModelVariant, Int>> = listOf(
-        SttModelVariant.TINY to R.id.menu_model_tiny,
-        SttModelVariant.BASE to R.id.menu_model_base,
-        SttModelVariant.SMALL to R.id.menu_model_small,
+    private fun modelMenuItems(): List<Pair<SttModelProfile, Int>> = listOf(
+        SttModelProfile.ENGLISH_TINY to R.id.menu_model_english_tiny,
+        SttModelProfile.ENGLISH_BASE to R.id.menu_model_english_base,
+        SttModelProfile.ENGLISH_SMALL to R.id.menu_model_english_small,
+        SttModelProfile.MULTILINGUAL_TINY to R.id.menu_model_multilingual_tiny,
+        SttModelProfile.MULTILINGUAL_BASE to R.id.menu_model_multilingual_base,
+        SttModelProfile.MULTILINGUAL_SMALL to R.id.menu_model_multilingual_small,
     )
 
     private fun toggleRecording() {
         val active = recorder
         if (active == null) {
             if (!hasMicrophonePermission()) {
-                requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
+                requestMicrophonePermission()
                 return
             }
             startRecording()
@@ -331,13 +357,11 @@ class MainActivity : android.app.Activity() {
         background.execute {
             runCatching { active.stopAndFinish() }.onSuccess { result ->
                 mainHandler.post {
-                    transcript.text = result.transcript
+                    transcript.text = result.transcript.ifBlank { getString(R.string.no_speech_detected) }
                     sampleMetrics.text = getString(
                         R.string.recording_complete,
                         result.audioSeconds,
                         result.inferenceSeconds,
-                        result.realTimeFactor,
-                        result.droppedFrames,
                     )
                     recordButton.setText(R.string.start_recording)
                     updateModelControls()
@@ -358,23 +382,54 @@ class MainActivity : android.app.Activity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_RECORD_AUDIO && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode != REQUEST_RECORD_AUDIO) return
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             startRecording()
+        } else {
+            setModelStatus(getString(R.string.microphone_permission_denied))
         }
+    }
+
+    private fun requestMicrophonePermission() {
+        if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.microphone_permission_rationale_title)
+                .setMessage(R.string.microphone_permission_rationale)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
+                }
+                .show()
+        } else {
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQUEST_RECORD_AUDIO)
+        }
+    }
+
+    private fun showAccessibilityDisclosure() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.accessibility_disclosure_title)
+            .setMessage(R.string.accessibility_disclosure_message)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.continue_to_accessibility_settings) { _, _ ->
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .show()
     }
 
     private fun updateModelControls() {
         modelInstaller = installerFor()
         val installed = modelInstaller.isInstalled()
+        val languages = activeLanguages()
         selectedModelLabel.text = getString(R.string.selected_model, modelInstaller.displayName())
-        finnishToggle.setText(
-            if (finnishEnabled()) R.string.finnish_on else R.string.finnish_off,
-        )
+        languageMenuButton.visibility = if (selectedModel.isMultilingual) View.VISIBLE else View.GONE
+        if (selectedModel.isMultilingual) {
+            languageMenuButton.text = getString(R.string.selected_languages, languageSummary(languages))
+        }
         val busy = modelInstallationInProgress || modelLoadingInProgress
         installModelButton.isEnabled = !busy && recorder == null && engine == null
         installModelButton.setText(if (installed) R.string.load_model else R.string.install_model)
         modelMenuButton.isEnabled = !busy && recorder == null
-        finnishToggle.isEnabled = !busy && recorder == null
+        languageMenuButton.isEnabled = !busy && recorder == null
         recordButton.isEnabled = !busy && engine != null && recorder == null
         if (busy || recorder != null) return
         when {
@@ -384,10 +439,24 @@ class MainActivity : android.app.Activity() {
         }
     }
 
-    private fun finnishEnabled(): Boolean = FinnishSetting.load(this)
+    private fun activeLanguages(): Set<SpokenLanguage> =
+        LanguageSelection.loadFor(this, selectedModel)
 
-    private fun installerFor(variant: SttModelVariant = selectedVariant): SttModelInstaller =
-        SttModelInstaller(this, variant, finnishEnabled())
+    private fun languageSummary(languages: Set<SpokenLanguage>): String =
+        SpokenLanguage.entries
+            .filter { it in languages }
+            .joinToString(", ", transform = ::languageLabel)
+
+    private fun languageLabel(language: SpokenLanguage): String =
+        getString(
+            when (language) {
+                SpokenLanguage.ENGLISH -> R.string.language_english
+                SpokenLanguage.FINNISH -> R.string.language_finnish
+            },
+        )
+
+    private fun installerFor(model: SttModelProfile = selectedModel): SttModelInstaller =
+        SttModelInstaller(this, model.asset)
 
     private fun setModelStatus(value: String) {
         modelStatus.text = value

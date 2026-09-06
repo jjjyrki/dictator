@@ -16,7 +16,7 @@ import io.jyri.dictator.focus.findFocusedInput
 import io.jyri.dictator.insert.AccessibilityImeTyper
 import io.jyri.dictator.insert.InsertMode
 import io.jyri.dictator.insert.TextInserter
-import io.jyri.dictator.model.FinnishSetting
+import io.jyri.dictator.model.LanguageSelection
 import io.jyri.dictator.model.ModelSelection
 import io.jyri.dictator.model.SttModelInstaller
 import io.jyri.dictator.overlay.BubbleOverlay
@@ -24,6 +24,7 @@ import io.jyri.dictator.session.DictationSessionController
 import io.jyri.dictator.session.DictationState
 import io.jyri.dictator.speech.PartialsSetting
 import io.jyri.dictator.speech.SttEngineHolder
+import io.jyri.dictator.speech.WhisperLanguageConfig
 import io.jyri.dictator.speech.WhisperLiveSpeechEngine
 import io.jyri.dictator.speech.WhisperSttEngine
 import java.util.concurrent.Executors
@@ -90,11 +91,11 @@ class DictationAccessibilityService : AccessibilityService() {
      * engine, so the bubble works without opening the app first.
      */
     private fun ensureEngineLoaded() {
-        val variant = ModelSelection.load(this)
-        val finnish = FinnishSetting.load(this)
-        if (SttEngineHolder.matches(variant, finnish)) return
+        val model = ModelSelection.load(this)
+        val languages = LanguageSelection.loadFor(this, model)
+        if (SttEngineHolder.matches(model, languages)) return
         SttEngineHolder.clear()
-        val installer = SttModelInstaller(this, variant, finnish)
+        val installer = SttModelInstaller(this, model.asset)
         if (!installer.isInstalled()) {
             if (!modelMissingWarned) {
                 modelMissingWarned = true
@@ -111,9 +112,12 @@ class DictationAccessibilityService : AccessibilityService() {
         Thread {
             runCatching {
                 SttEngineHolder.install(
-                    variant,
-                    finnish,
-                    WhisperSttEngine(installer.modelFile(), installer.language()),
+                    model,
+                    languages,
+                    WhisperSttEngine(
+                        installer.modelFile(),
+                        WhisperLanguageConfig.forModel(model, languages),
+                    ),
                 )
             }
         }.start()

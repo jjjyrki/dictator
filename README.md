@@ -2,7 +2,7 @@
 
 Dictator is a personal, sideloaded Android dictation assistant. It puts a small microphone bubble above editable text fields, transcribes speech on the device, and inserts the result without replacing the user's keyboard.
 
-The product question is whether on-device English dictation can transcribe faster than real time with good quality on the target Samsung Galaxy S23. The current APK uses the whisper.cpp runtime with a FUTO ACFT fine-tuned Whisper model. The Accessibility overlay remains a separate stub until that test passes.
+The product question is whether on-device English and Finnish dictation can transcribe faster than real time with good quality on the target Samsung Galaxy S23. The current APK uses the whisper.cpp runtime with a FUTO ACFT fine-tuned Whisper model. The Accessibility overlay remains a separate stub until that test passes.
 
 ## Start here
 
@@ -22,7 +22,7 @@ The desktop baseline is skipped. The product path is runtime selection, then And
 
 ## Sideload the STT prototype
 
-Target: Android 14+, `arm64-v8a` on the Galaxy S23. The APK includes the whisper.cpp JNI runtime. It downloads the 78 MB FUTO ACFT Whisper model on first setup. The model stays in app-private storage and works offline after installation.
+Target: Android 14+, `arm64-v8a` on the Galaxy S23. The APK includes the whisper.cpp JNI runtime. It downloads the selected FUTO ACFT Whisper model on first setup; the choices are English-only or multilingual and range from about 43 MB to 264 MB. Models stay in app-private storage and work offline after installation.
 
 ```sh
 export ANDROID_HOME="$HOME/Library/Android/sdk"
@@ -31,10 +31,37 @@ native/build-android.sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Open Dictator and tap **Model** to choose tiny, base, or small. Select an installed model to load it; for a model marked not installed, choose it first and tap **Install selected model**. Then record a short English sentence. The app shows the transcript and keeps the audio duration, inference duration, real-time factor, and dropped-frame metrics in **Last sample metrics**. Do not enable or use the overlay as the acceptance test yet.
+Open Dictator and tap **Model** to choose an English-only or multilingual tiny, base, or small model. For a multilingual model, tap **Select spoken languages** and choose the languages Whisper may consider; English and Finnish are currently supported. Select an installed model to load it; for a model marked not installed, choose it first and tap **Download model**. Then record a short sentence. The app shows the transcript and keeps the audio and inference duration in **Last test**. Do not enable or use the overlay as the acceptance test yet.
+
+## Run the ADB UI tests
+
+The instrumentation suite covers the setup screen, model menu, persisted settings, and the link to Android's Accessibility settings. It does not download a model or make speech assertions, so it is safe to run repeatedly on a connected test device.
+
+```sh
+# Build, install, and run every instrumentation test.
+scripts/run-adb-tests.sh
+
+# Run one test class or method.
+scripts/run-adb-tests.sh io.jyri.dictator.MainActivityInstrumentationTest
+scripts/run-adb-tests.sh io.jyri.dictator.MainActivityInstrumentationTest#launchShowsSetupControls
+```
+
+After installing the APKs, the same runner can be invoked directly:
+
+```sh
+adb shell am instrument -w -r io.jyri.dictator.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The script leaves app data alone by default. Use `CLEAR_APP_DATA=1 scripts/run-adb-tests.sh` on a disposable device when you need a clean no-model state. The device must run Android 14 or newer. An arm64 device is required if it already has a model installed and the test launches the native Whisper engine.
+
+Gradle can run the same suite after a device is connected:
+
+```sh
+./gradlew :app:connectedDebugAndroidTest
+```
 
 ## Project boundaries
 
-This is a local tool for one person's device. It has no accounts, cloud backend, synchronization, analytics, history UI, LLM post-processing, iOS app, Finnish recognition, or custom keyboard.
+This is a local tool for one person's device. It has no accounts, cloud backend, synchronization, analytics, history UI, LLM post-processing, iOS app, or custom keyboard.
 
 Model weights and generated artifacts do not belong in Git. Store their source, version, checksum, conversion steps, and benchmark results in documentation instead.

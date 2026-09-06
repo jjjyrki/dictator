@@ -2,23 +2,32 @@ package io.jyri.dictator.model
 
 import android.content.Context
 
-/** Persists the user's model choice; defaults to the most accurate model. */
+/** Persists the complete checkpoint family and size choice. */
 object ModelSelection {
     private const val PREFS = "model_selection"
-    private const val KEY_NAME = "variant"
+    private const val KEY_PROFILE = "profile"
+    private const val LEGACY_KEY_VARIANT = "variant"
 
-    val default: SttModelVariant = SttModelVariant.SMALL
+    val default: SttModelProfile = SttModelProfile.default
 
-    fun load(context: Context): SttModelVariant {
+    @Suppress("DEPRECATION")
+    fun load(context: Context): SttModelProfile {
         val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val name = stored.getString(KEY_NAME, null) ?: return default
-        return SttModelVariant.entries.firstOrNull { it.name == name } ?: default
+            .getString(KEY_PROFILE, null)
+        SttModelProfile.entries.firstOrNull { it.name == stored }?.let { return it }
+
+        // Preserve installations created before model family became part of the
+        // selection. The old Finnish preference identified the family.
+        val legacyVariant = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(LEGACY_KEY_VARIANT, null)
+            ?.let { name -> SttModelVariant.entries.firstOrNull { it.name == name } }
+        return legacyVariant?.let { SttModelProfile.fromLegacy(it, FinnishSetting.load(context)) } ?: default
     }
 
-    fun store(context: Context, variant: SttModelVariant) {
+    fun store(context: Context, profile: SttModelProfile) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
-            .putString(KEY_NAME, variant.name)
+            .putString(KEY_PROFILE, profile.name)
             .apply()
     }
 }

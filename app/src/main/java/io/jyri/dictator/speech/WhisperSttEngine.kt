@@ -1,5 +1,6 @@
 package io.jyri.dictator.speech
 
+import io.jyri.dictator.model.SpokenLanguage
 import java.io.File
 
 /**
@@ -9,7 +10,7 @@ import java.io.File
  */
 class WhisperSttEngine(
     modelFile: File,
-    private val language: String = "en",
+    private val languageConfig: WhisperLanguageConfig = WhisperLanguageConfig.fixed(SpokenLanguage.ENGLISH),
     private val threads: Int = DEFAULT_THREADS,
 ) {
     private var handle: Long = nativeCreate(modelFile.absolutePath, threads)
@@ -36,14 +37,22 @@ class WhisperSttEngine(
     fun finish(): String {
         if (bufferedSamples == 0) return ""
         val clip = if (bufferedSamples == buffer.size) buffer else buffer.copyOf(bufferedSamples)
-        return nativeTranscribe(handle, clip, threads, language)
+        return transcribeClip(clip)
     }
 
     /** Transcribes an externally captured 16 kHz mono clip on the shared native context. */
     fun transcribe(clip: FloatArray): String {
         check(handle != 0L) { "The Whisper engine is closed" }
-        return nativeTranscribe(handle, clip, threads, language)
+        return transcribeClip(clip)
     }
+
+    private fun transcribeClip(clip: FloatArray): String = nativeTranscribe(
+        handle,
+        clip,
+        threads,
+        languageConfig.language,
+        languageConfig.allowedLanguageCodes.joinToString(","),
+    )
 
     fun close() {
         if (handle != 0L) {
@@ -69,6 +78,7 @@ class WhisperSttEngine(
         pcm16kMono: FloatArray,
         threads: Int,
         language: String,
+        allowedLanguages: String,
     ): String
 
     private external fun nativeClose(handle: Long)

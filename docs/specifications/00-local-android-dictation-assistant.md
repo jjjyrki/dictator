@@ -52,7 +52,7 @@ The performance gate is the hard gate. A good overlay cannot compensate for a sp
 
 ### In scope for the first usable version
 
-- English dictation using Kyutai `stt-1b-en_fr`.
+- English and Finnish dictation using the selected local Whisper ACFT model.
 - Local Mimi audio encoding and Kyutai streaming STT inference.
 - A minimal setup and diagnostics Activity.
 - Microphone capture from a foreground service.
@@ -69,7 +69,7 @@ The performance gate is the hard gate. A good overlay cannot compensate for a sp
 - A custom Android keyboard or `InputMethodService`.
 - Cloud speech recognition, cloud storage, accounts, synchronization, or a web application.
 - iOS support.
-- Finnish speech recognition.
+- Speech languages beyond the currently supported English/Finnish multilingual selection.
 - AI rewriting, tone changes, grammar rewriting, or LLM post-processing.
 - Transcript history, search, team features, analytics, or telemetry.
 - Play Store publishing and commercial-grade onboarding.
@@ -87,7 +87,7 @@ The only user is the owner of the Android device. The owner can grant microphone
 
 The first overlay APK targets Android 14 (API 34) and `arm64-v8a`. Chipset, RAM, and storage still belong in the first speech benchmark report. SDK min and target are 34 for this personal device build.
 
-The initial language requirement is English. The selected checkpoint is `stt-1b-en_fr`, even though French support is not required for the first version.
+The initial spoken-language requirement is English and Finnish. The current Whisper implementation uses a multilingual checkpoint with a user-selected language allow-list for mixed English/Finnish dictation.
 
 The owner accepts the security implications of an Accessibility Service on a personal device. The app still has to handle that privilege narrowly and must not log screen contents, field contents, dictated audio, or transcripts.
 

@@ -8,16 +8,11 @@ import java.net.URL
 import java.security.MessageDigest
 
 class SttModelInstaller(context: Context, private val model: SttModelAsset) {
-    constructor(context: Context, variant: SttModelVariant, finnish: Boolean) :
-        this(context, variant.asset(finnish))
-
     private val modelDirectory = File(context.filesDir, "models/${model.directoryName}")
 
     fun directory(): File = modelDirectory
 
     fun modelFile(): File = File(modelDirectory, model.fileName)
-
-    fun language(): String = model.language
 
     fun displayName(): String = model.displayName
 

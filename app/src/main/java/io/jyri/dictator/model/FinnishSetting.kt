@@ -3,9 +3,9 @@ package io.jyri.dictator.model
 import android.content.Context
 
 /**
- * When on, the selected size tier loads FUTO's multilingual ACFT file and
- * transcribes as Finnish. English-only `_en` weights cannot do Finnish.
+ * Legacy preference retained only to migrate pre-language-selector installs.
  */
+@Deprecated("Used only when migrating the legacy model preference")
 object FinnishSetting {
     private const val PREFS = "finnish"
     private const val KEY_ENABLED = "enabled"

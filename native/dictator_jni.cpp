@@ -49,7 +49,8 @@ Java_io_jyri_dictator_speech_WhisperSttEngine_nativeTranscribe(
     jlong handle,
     jfloatArray pcm,
     jint threads,
-    jstring language) {
+    jstring language,
+    jstring allowedLanguages) {
     if (handle == 0) {
         throwAndReturn(env, "the Whisper engine is closed");
         return nullptr;
@@ -59,10 +60,16 @@ Java_io_jyri_dictator_speech_WhisperSttEngine_nativeTranscribe(
         // GetStringUTFChars already left an OutOfMemoryError pending.
         return nullptr;
     }
+    const char * allowed = env->GetStringUTFChars(allowedLanguages, nullptr);
+    if (allowed == nullptr) {
+        env->ReleaseStringUTFChars(language, lang);
+        return nullptr;
+    }
     const jsize length = env->GetArrayLength(pcm);
     std::vector<float> samples(static_cast<size_t>(length));
     env->GetFloatArrayRegion(pcm, 0, length, samples.data());
     if (env->ExceptionCheck()) {
+        env->ReleaseStringUTFChars(allowedLanguages, allowed);
         env->ReleaseStringUTFChars(language, lang);
         return nullptr;
     }
@@ -72,7 +79,9 @@ Java_io_jyri_dictator_speech_WhisperSttEngine_nativeTranscribe(
         samples.data(),
         samples.size(),
         static_cast<int>(threads),
-        lang);
+        lang,
+        allowed);
+    env->ReleaseStringUTFChars(allowedLanguages, allowed);
     env->ReleaseStringUTFChars(language, lang);
     return toJString(env, text);
 }

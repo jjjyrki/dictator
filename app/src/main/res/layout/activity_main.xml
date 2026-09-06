@@ -2,8 +2,12 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:clipToPadding="false"
     android:fillViewport="true"
-    android:padding="24dp">
+    android:paddingStart="20dp"
+    android:paddingTop="24dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="32dp">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,130 +20,304 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
+            <ImageView
+                android:id="@+id/appLogo"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:background="@drawable/brand_mark"
+                android:contentDescription="@string/app_name"
+                android:padding="14dp"
+                android:src="@drawable/dictator" />
+
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
                 android:layout_weight="1"
-                android:text="@string/setup_title"
-                android:textColor="@color/setup_text"
-                android:textSize="24sp"
-                android:textStyle="bold" />
+                android:orientation="vertical">
 
-            <Button
-                android:id="@+id/modelMenu"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:contentDescription="@string/select_model"
-                android:minHeight="48dp"
-                android:text="@string/model_menu_button" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/app_name"
+                    android:textColor="@color/setup_text"
+                    android:textSize="22sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/app_tagline"
+                    android:textColor="@color/setup_muted"
+                    android:textSize="14sp" />
+            </LinearLayout>
         </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="32dp"
+            android:text="@string/setup_title"
+            android:textColor="@color/setup_text"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:lineSpacingExtra="2dp"
             android:text="@string/setup_body"
             android:textColor="@color/setup_muted"
             android:textSize="16sp" />
 
         <TextView
-            android:id="@+id/selectedModel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:textColor="@color/setup_muted"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/modelStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="@color/setup_text"
-            android:textSize="16sp" />
-
-        <Button
-            android:id="@+id/installModel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="@string/install_model" />
-
-        <Button
-            android:id="@+id/record"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/start_recording" />
-
-        <TextView
-            android:id="@+id/transcript"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:background="#1AFFFFFF"
-            android:minHeight="96dp"
-            android:padding="12dp"
-            android:textColor="@color/setup_text"
-            android:textIsSelectable="true"
-            android:textSize="18sp" />
-
-        <TextView
-            android:id="@+id/sampleMetricsTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/sample_metrics_title"
-            android:textColor="@color/setup_text"
-            android:textSize="16sp"
+            android:text="@string/privacy_note"
+            android:textColor="@color/setup_accent_soft"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
-            android:id="@+id/sampleMetrics"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="#1AFFFFFF"
-            android:padding="12dp"
-            android:text="@string/sample_metrics_empty"
-            android:textColor="@color/setup_muted"
-            android:textIsSelectable="true"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/accessibilityStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:textColor="@color/setup_warn"
-            android:textSize="16sp" />
+            android:letterSpacing="0.06"
+            android:text="@string/setup_step_model"
+            android:textColor="@color/setup_accent_soft"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/openAccessibility"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/open_accessibility_settings" />
+            android:layout_marginTop="10dp"
+            android:background="@drawable/setup_card"
+            android:orientation="vertical"
+            android:padding="16dp">
 
-        <Button
-            android:id="@+id/toggleInsertMode"
+            <TextView
+                android:id="@+id/selectedModel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/setup_text"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/model_helper"
+                android:textColor="@color/setup_muted"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/modelStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="@color/setup_text"
+                android:textSize="15sp" />
+
+            <Button
+                android:id="@+id/modelMenu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:backgroundTint="@color/setup_button_tint"
+                android:minHeight="52dp"
+                android:text="@string/change_model"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/installModel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="@color/setup_button_tint"
+                android:minHeight="52dp"
+                android:text="@string/install_model"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/languageMenu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="@color/setup_button_tint"
+                android:contentDescription="@string/select_languages"
+                android:minHeight="52dp"
+                android:text="@string/select_languages"
+                android:textAllCaps="false"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/toggle_insert_mode" />
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.06"
+            android:text="@string/setup_step_accessibility"
+            android:textColor="@color/setup_accent_soft"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
-        <Button
-            android:id="@+id/togglePartials"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/toggle_partials" />
+            android:layout_marginTop="10dp"
+            android:background="@drawable/setup_card"
+            android:orientation="vertical"
+            android:padding="16dp">
 
-        <Button
-            android:id="@+id/toggleFinnish"
+            <TextView
+                android:id="@+id/accessibilityStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/setup_warn"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:lineSpacingExtra="2dp"
+                android:text="@string/accessibility_helper"
+                android:textColor="@color/setup_muted"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/openAccessibility"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:backgroundTint="@color/setup_button_tint"
+                android:minHeight="52dp"
+                android:text="@string/open_accessibility_settings"
+                android:textAllCaps="false" />
+        </LinearLayout>
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/toggle_finnish" />
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.06"
+            android:text="@string/setup_step_test"
+            android:textColor="@color/setup_accent_soft"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/setup_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="2dp"
+                android:text="@string/test_helper"
+                android:textColor="@color/setup_muted"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/record"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:backgroundTint="@color/setup_button_tint"
+                android:minHeight="52dp"
+                android:text="@string/start_recording"
+                android:textAllCaps="false" />
+
+            <TextView
+                android:id="@+id/transcript"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/setup_inset"
+                android:minHeight="104dp"
+                android:padding="14dp"
+                android:text="@string/transcript_empty"
+                android:textColor="@color/setup_text"
+                android:textIsSelectable="true"
+                android:textSize="17sp" />
+
+            <TextView
+                android:id="@+id/sampleMetricsTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/sample_metrics_title"
+                android:textColor="@color/setup_text"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/sampleMetrics"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/sample_metrics_empty"
+                android:textColor="@color/setup_muted"
+                android:textIsSelectable="true"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.06"
+            android:text="@string/preferences_title"
+            android:textColor="@color/setup_accent_soft"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/setup_card"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <Button
+                android:id="@+id/toggleInsertMode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="@color/setup_button_tint"
+                android:minHeight="52dp"
+                android:text="@string/toggle_insert_mode"
+                android:textAllCaps="false" />
+
+            <Button
+                android:id="@+id/togglePartials"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="@color/setup_button_tint"
+                android:minHeight="52dp"
+                android:text="@string/toggle_partials"
+                android:textAllCaps="false" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:lineSpacingExtra="2dp"
+            android:text="@string/privacy_footer"
+            android:textColor="@color/setup_muted"
+            android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>

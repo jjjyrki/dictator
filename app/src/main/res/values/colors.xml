@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="setup_bg">#111111</color>
-    <color name="setup_text">#F2F2F2</color>
-    <color name="setup_muted">#B3B3B3</color>
+    <color name="setup_bg">#111116</color>
+    <color name="setup_surface">#1C1C24</color>
+    <color name="setup_inset">#15151C</color>
+    <color name="setup_border">#30303B</color>
+    <color name="setup_text">#F7F5FA</color>
+    <color name="setup_muted">#B9B5C2</color>
+    <color name="setup_accent">#A985F2</color>
+    <color name="setup_accent_soft">#D1BFFF</color>
+    <color name="setup_button_tint">#7356B9</color>
     <color name="setup_ok">#7DCEA0</color>
     <color name="setup_warn">#F5B041</color>
     <color name="bubble_error">#6C3483</color>

@@ -1,6 +1,7 @@
 package io.jyri.dictator.speech
 
-import io.jyri.dictator.model.SttModelVariant
+import io.jyri.dictator.model.SpokenLanguage
+import io.jyri.dictator.model.SttModelProfile
 
 /**
  * Process-wide holder for the loaded Whisper engine. The main activity loads
@@ -12,31 +13,35 @@ object SttEngineHolder {
         private set
 
     @Volatile
-    var loadedVariant: SttModelVariant? = null
+    var loadedModel: SttModelProfile? = null
         private set
 
     @Volatile
-    var loadedFinnish: Boolean? = null
+    var loadedLanguages: Set<SpokenLanguage> = emptySet()
         private set
 
     @Synchronized
-    fun install(variant: SttModelVariant, finnish: Boolean, engine: WhisperSttEngine) {
+    fun install(
+        model: SttModelProfile,
+        languages: Set<SpokenLanguage>,
+        engine: WhisperSttEngine,
+    ) {
         val previous = this.engine
         this.engine = engine
-        loadedVariant = variant
-        loadedFinnish = finnish
+        loadedModel = model
+        loadedLanguages = languages.toSet()
         if (previous !== engine) previous?.close()
     }
 
-    fun matches(variant: SttModelVariant, finnish: Boolean): Boolean =
-        engine != null && loadedVariant == variant && loadedFinnish == finnish
+    fun matches(model: SttModelProfile, languages: Set<SpokenLanguage>): Boolean =
+        engine != null && loadedModel == model && loadedLanguages == languages
 
     @Synchronized
     fun clear() {
         val previous = engine
         engine = null
-        loadedVariant = null
-        loadedFinnish = null
+        loadedModel = null
+        loadedLanguages = emptySet()
         previous?.close()
     }
 }

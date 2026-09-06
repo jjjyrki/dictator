@@ -7,10 +7,20 @@ object EditableTarget {
         if (node == null) return false
         if (!node.isVisibleToUser) return false
         if (!node.isEnabled) return false
-        if (!node.isEditable) return false
         if (node.isPassword) return false
-        return true
+        return supportsTextInput(
+            editable = node.isEditable,
+            canSetText = node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_TEXT },
+            canSetSelection = node.actionList.any { it.id == AccessibilityNodeInfo.ACTION_SET_SELECTION },
+        )
     }
+
+    // Some custom/Compose inputs expose text actions without setting isEditable.
+    internal fun supportsTextInput(
+        editable: Boolean,
+        canSetText: Boolean,
+        canSetSelection: Boolean,
+    ): Boolean = editable || canSetText || canSetSelection
 
     fun snapshot(node: AccessibilityNodeInfo): TargetSnapshot {
         return TargetSnapshot(

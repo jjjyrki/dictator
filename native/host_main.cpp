@@ -11,8 +11,8 @@
 #include "whisper.h"
 
 int main(int argc, char ** argv) {
-    if (argc != 4) {
-        std::cerr << "usage: transcribe_fixture_host <model.bin> <pcm-f32le> <threads>\n";
+    if (argc != 4 && argc != 5) {
+        std::cerr << "usage: transcribe_fixture_host <model.bin> <pcm-f32le> <threads> [language]\n";
         return 1;
     }
     whisper_context_params contextParams = whisper_context_default_params();
@@ -35,11 +35,13 @@ int main(int argc, char ** argv) {
         __builtin_memcpy(&value, &bits, sizeof(value));
         samples.push_back(value);
     }
+    const char * language = argc == 5 ? argv[4] : "en";
     const std::string text = transcribeDictation(
         context,
         samples.data(),
         samples.size(),
-        std::stoi(argv[3]));
+        std::stoi(argv[3]),
+        language);
     std::cout << text << "\n";
     whisper_free(context);
     return 0;

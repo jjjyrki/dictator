@@ -1,6 +1,7 @@
 // JNI bridge for Dictator's on-device Whisper dictation engine.
 #include <jni.h>
 #include <string>
+#include <vector>
 
 #include "transcribe.hpp"
 #include "whisper.h"
@@ -12,7 +13,10 @@ jstring toJString(JNIEnv * env, const std::string & value) {
 }
 
 jlong throwAndReturn(JNIEnv * env, const std::string & message) {
-    env->ThrowNew(env->FindClass("java/lang/IllegalStateException"), message.c_str());
+    jclass cls = env->FindClass("java/lang/IllegalStateException");
+    if (cls != nullptr) {
+        env->ThrowNew(cls, message.c_str());
+    }
     return 0;
 }
 
@@ -44,20 +48,32 @@ Java_io_jyri_dictator_speech_WhisperSttEngine_nativeTranscribe(
     jobject /* thunk */,
     jlong handle,
     jfloatArray pcm,
-    jint threads) {
+    jint threads,
+    jstring language) {
     if (handle == 0) {
         throwAndReturn(env, "the Whisper engine is closed");
+        return nullptr;
+    }
+    const char * lang = env->GetStringUTFChars(language, nullptr);
+    if (lang == nullptr) {
+        // GetStringUTFChars already left an OutOfMemoryError pending.
         return nullptr;
     }
     const jsize length = env->GetArrayLength(pcm);
     std::vector<float> samples(static_cast<size_t>(length));
     env->GetFloatArrayRegion(pcm, 0, length, samples.data());
+    if (env->ExceptionCheck()) {
+        env->ReleaseStringUTFChars(language, lang);
+        return nullptr;
+    }
     struct whisper_context * context = reinterpret_cast<struct whisper_context *>(handle);
     const std::string text = transcribeDictation(
         context,
         samples.data(),
         samples.size(),
-        static_cast<int>(threads));
+        static_cast<int>(threads),
+        lang);
+    env->ReleaseStringUTFChars(language, lang);
     return toJString(env, text);
 }
 

@@ -31,7 +31,7 @@ native/build-android.sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Open Dictator, install the model on Wi-Fi, load it, then record a short English sentence. The app reports audio duration, inference duration, real-time factor, and dropped frames. Do not enable or use the overlay as the acceptance test yet.
+Open Dictator and tap **Model** to choose tiny, base, or small. Select an installed model to load it; for a model marked not installed, choose it first and tap **Install selected model**. Then record a short English sentence. The app shows the transcript and keeps the audio duration, inference duration, real-time factor, and dropped-frame metrics in **Last sample metrics**. Do not enable or use the overlay as the acceptance test yet.
 
 ## Project boundaries
 

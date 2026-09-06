@@ -9,6 +9,7 @@ import java.io.File
  */
 class WhisperSttEngine(
     modelFile: File,
+    private val language: String = "en",
     private val threads: Int = DEFAULT_THREADS,
 ) {
     private var handle: Long = nativeCreate(modelFile.absolutePath, threads)
@@ -35,7 +36,13 @@ class WhisperSttEngine(
     fun finish(): String {
         if (bufferedSamples == 0) return ""
         val clip = if (bufferedSamples == buffer.size) buffer else buffer.copyOf(bufferedSamples)
-        return nativeTranscribe(handle, clip, threads)
+        return nativeTranscribe(handle, clip, threads, language)
+    }
+
+    /** Transcribes an externally captured 16 kHz mono clip on the shared native context. */
+    fun transcribe(clip: FloatArray): String {
+        check(handle != 0L) { "The Whisper engine is closed" }
+        return nativeTranscribe(handle, clip, threads, language)
     }
 
     fun close() {
@@ -57,7 +64,12 @@ class WhisperSttEngine(
 
     private external fun nativeCreate(modelPath: String, threads: Int): Long
 
-    private external fun nativeTranscribe(handle: Long, pcm16kMono: FloatArray, threads: Int): String
+    private external fun nativeTranscribe(
+        handle: Long,
+        pcm16kMono: FloatArray,
+        threads: Int,
+        language: String,
+    ): String
 
     private external fun nativeClose(handle: Long)
 }

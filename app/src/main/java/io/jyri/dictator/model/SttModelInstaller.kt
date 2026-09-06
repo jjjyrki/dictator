@@ -1,17 +1,25 @@
 package io.jyri.dictator.model
 
 import android.content.Context
-import io.jyri.dictator.model.SttModelVariant
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
 
-class SttModelInstaller(context: Context, private val variant: SttModelVariant) {
-    private val modelDirectory = File(context.filesDir, "models/${variant.directoryName}")
+class SttModelInstaller(context: Context, private val model: SttModelAsset) {
+    constructor(context: Context, variant: SttModelVariant, finnish: Boolean) :
+        this(context, variant.asset(finnish))
+
+    private val modelDirectory = File(context.filesDir, "models/${model.directoryName}")
 
     fun directory(): File = modelDirectory
+
+    fun modelFile(): File = File(modelDirectory, model.fileName)
+
+    fun language(): String = model.language
+
+    fun displayName(): String = model.displayName
 
     fun isInstalled(): Boolean = assets.all { asset ->
         File(modelDirectory, asset.fileName).length() == asset.sizeBytes
@@ -100,10 +108,10 @@ class SttModelInstaller(context: Context, private val variant: SttModelVariant) 
 
     private val assets = listOf(
         Asset(
-            fileName = variant.fileName,
-            sizeBytes = variant.sizeBytes,
-            sha256 = variant.sha256,
-            url = "${variant.downloadUrl}",
+            fileName = model.fileName,
+            sizeBytes = model.sizeBytes,
+            sha256 = model.sha256,
+            url = model.downloadUrl,
         ),
     )
 
@@ -118,7 +126,5 @@ class SttModelInstaller(context: Context, private val variant: SttModelVariant) 
         const val BUFFER_BYTES = 1024 * 1024
         const val CONNECT_TIMEOUT_MS = 30_000
         const val READ_TIMEOUT_MS = 30_000
-
-        const val MODEL_BASE_URL = "https://voiceinput.futo.org/VoiceInput"
     }
 }

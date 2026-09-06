@@ -54,17 +54,24 @@ class LiveSttRecorder(
             ),
             FRAME_SAMPLES * BYTES_PER_PCM16 * MAX_QUEUED_FRAMES,
         )
-        val recorder = AudioRecord.Builder()
-            .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setSampleRate(SAMPLE_RATE_HZ)
-                    .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .build(),
-            )
-            .setBufferSizeInBytes(bufferSize)
-            .build()
+        val recorder = try {
+            AudioRecord.Builder()
+                .setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(SAMPLE_RATE_HZ)
+                        .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .build(),
+                )
+                .setBufferSizeInBytes(bufferSize)
+                .build()
+        } catch (error: SecurityException) {
+            failure.compareAndSet(null, error)
+            recording.set(false)
+            captureFinished.set(true)
+            return
+        }
         try {
             check(recorder.state == AudioRecord.STATE_INITIALIZED) { "Could not open microphone at $SAMPLE_RATE_HZ Hz" }
             recorder.startRecording()
@@ -93,7 +100,7 @@ class LiveSttRecorder(
         try {
             while (!captureFinished.get() || frames.isNotEmpty()) {
                 val frame = frames.poll(POLL_TIMEOUT_MS, TimeUnit.MILLISECONDS) ?: continue
-                // Whisper transcribes once at finish; there are no partials yet.
+                // Whisper transcribes once at finish; the test bench has no partials.
                 measureInference { engine.feed(frame) }
             }
         } catch (error: Throwable) {

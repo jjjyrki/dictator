@@ -13,7 +13,8 @@ inline std::string transcribeDictation(
     struct whisper_context * context,
     const float * pcm16kMono,
     size_t sampleCount,
-    int threads
+    int threads,
+    const char * language
 ) {
     if (sampleCount == 0) {
         return std::string();
@@ -26,7 +27,8 @@ inline std::string transcribeDictation(
     params.print_realtime = false;
     params.print_timestamps = false;
     params.translate = false;
-    params.language = "en";
+    const std::string lang = (language != nullptr && language[0] != '\0') ? language : "en";
+    params.language = lang.c_str();
     params.n_threads = threads;
     // ACFT models expect the audio context to match the clip length. The same
     // formula is used by FUTO Voice Input's voiceinput.cpp.

@@ -2,7 +2,6 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/setup_bg"
     android:fillViewport="true"
     android:padding="24dp">
 
@@ -11,13 +10,29 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/setup_title"
-            android:textColor="@color/setup_text"
-            android:textSize="24sp"
-            android:textStyle="bold" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/setup_title"
+                android:textColor="@color/setup_text"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/modelMenu"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/select_model"
+                android:minHeight="48dp"
+                android:text="@string/model_menu_button" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
@@ -28,58 +43,20 @@
             android:textSize="16sp" />
 
         <TextView
-            android:id="@+id/modelStatus"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:textColor="@color/setup_text"
-            android:textSize="16sp" />
-
-        <TextView
+            android:id="@+id/selectedModel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="@string/model_selector_title"
-            android:textColor="@color/setup_text"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textColor="@color/setup_muted"
+            android:textSize="14sp" />
 
-        <RadioGroup
-            android:id="@+id/modelSelector"
+        <TextView
+            android:id="@+id/modelStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="#1AFFFFFF"
-            android:padding="12dp">
-
-            <RadioButton
-                android:id="@+id/modelTiny"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="40dp"
-                android:text="@string/model_tiny"
-                android:textColor="@color/setup_text"
-                android:textSize="16sp" />
-
-            <RadioButton
-                android:id="@+id/modelBase"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:minHeight="40dp"
-                android:text="@string/model_base"
-                android:textColor="@color/setup_text"
-                android:textSize="16sp" />
-
-            <RadioButton
-                android:id="@+id/modelSmall"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="40dp"
-                android:text="@string/model_small"
-                android:textColor="@color/setup_text"
-                android:textSize="16sp" />
-        </RadioGroup>
+            android:textColor="@color/setup_text"
+            android:textSize="16sp" />
 
         <Button
             android:id="@+id/installModel"
@@ -87,13 +64,6 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="@string/install_model" />
-
-        <Button
-            android:id="@+id/loadModel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/load_model" />
 
         <Button
             android:id="@+id/record"
@@ -115,6 +85,28 @@
             android:textSize="18sp" />
 
         <TextView
+            android:id="@+id/sampleMetricsTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/sample_metrics_title"
+            android:textColor="@color/setup_text"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/sampleMetrics"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#1AFFFFFF"
+            android:padding="12dp"
+            android:text="@string/sample_metrics_empty"
+            android:textColor="@color/setup_muted"
+            android:textIsSelectable="true"
+            android:textSize="14sp" />
+
+        <TextView
             android:id="@+id/accessibilityStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -128,5 +120,26 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="@string/open_accessibility_settings" />
+
+        <Button
+            android:id="@+id/toggleInsertMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/toggle_insert_mode" />
+
+        <Button
+            android:id="@+id/togglePartials"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/toggle_partials" />
+
+        <Button
+            android:id="@+id/toggleFinnish"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/toggle_finnish" />
     </LinearLayout>
 </ScrollView>

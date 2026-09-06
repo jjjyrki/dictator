@@ -68,6 +68,9 @@ class MainActivity : android.app.Activity() {
         findViewById<Button>(R.id.openAccessibility).setOnClickListener {
             showAccessibilityDisclosure()
         }
+        findViewById<Button>(R.id.licenses).setOnClickListener {
+            startActivity(Intent(this, LicensesActivity::class.java))
+        }
         installModelButton.setOnClickListener { installModel() }
         val toggleInsertMode = findViewById<Button>(R.id.toggleInsertMode)
         val refreshInsertModeLabel = {

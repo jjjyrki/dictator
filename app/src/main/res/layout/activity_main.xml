@@ -310,6 +310,16 @@
                 android:textAllCaps="false" />
         </LinearLayout>
 
+        <Button
+            android:id="@+id/licenses"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="@color/setup_button_tint"
+            android:minHeight="52dp"
+            android:text="@string/licenses_button"
+            android:textAllCaps="false" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

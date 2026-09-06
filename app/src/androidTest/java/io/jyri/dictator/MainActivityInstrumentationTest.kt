@@ -74,6 +74,7 @@ class MainActivityInstrumentationTest {
             "openAccessibility",
             "toggleInsertMode",
             "togglePartials",
+            "licenses",
         ).forEach { id ->
             assertNotNull("Missing view: $id", view(id))
         }
@@ -82,6 +83,17 @@ class MainActivityInstrumentationTest {
         val enabled = targetContext.getString(R.string.accessibility_enabled)
         val disabled = targetContext.getString(R.string.accessibility_disabled)
         assertTrue("Unexpected accessibility status: $status", status == enabled || status == disabled)
+    }
+
+    @Test
+    fun licensesButtonOpensLicenseView() {
+        view("licenses").click()
+
+        val body = view("licensesBody").text
+        assertTrue(body.contains("MIT License"))
+        assertTrue(body.contains("Apache License"))
+        device.pressBack()
+        waitForApp()
     }
 
     @Test

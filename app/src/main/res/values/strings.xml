@@ -15,6 +15,10 @@
     <string name="test_helper">Record a sample here to check your microphone and transcription. Once the bubble is on, you can dictate in any app with a text field.</string>
     <string name="preferences_title">PREFERENCES</string>
     <string name="privacy_footer">Audio and transcripts stay on this device. The only network request is downloading the model you choose.</string>
+    <string name="licenses_button">Open-source licenses</string>
+    <string name="licenses_title">Open-source licenses</string>
+    <string name="licenses_intro">Dictator uses open-source software and downloads speech models licensed by their authors. These notices are provided for attribution.</string>
+    <string name="licenses_back">Back</string>
     <string name="model_installing">Downloading model files…</string>
     <string name="model_install_progress">%1$d/%2$d: %3$s, %4$d MiB of %5$d MiB</string>
     <string name="model_not_installed">Download a model to get started.</string>

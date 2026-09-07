@@ -92,6 +92,7 @@ class MainActivityInstrumentationTest {
         val body = view("licensesBody").text
         assertTrue(body.contains("MIT License"))
         assertTrue(body.contains("Apache License"))
+        assertTrue(body.contains("MATERIAL COMPONENTS FOR ANDROID"))
         device.pressBack()
         waitForApp()
     }

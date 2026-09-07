@@ -11,9 +11,10 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.View
 import android.view.accessibility.AccessibilityManager
-import android.widget.Button
-import android.widget.PopupMenu
 import android.widget.TextView
+import androidx.appcompat.widget.PopupMenu
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.widget.Toast
 import io.jyri.dictator.audio.LiveSttRecorder
 import io.jyri.dictator.insert.InsertMode
@@ -38,10 +39,10 @@ class MainActivity : android.app.Activity() {
     private lateinit var selectedModelLabel: TextView
     private lateinit var sampleMetrics: TextView
     private lateinit var transcript: TextView
-    private lateinit var recordButton: Button
-    private lateinit var installModelButton: Button
-    private lateinit var modelMenuButton: Button
-    private lateinit var languageMenuButton: Button
+    private lateinit var recordButton: MaterialButton
+    private lateinit var installModelButton: MaterialButton
+    private lateinit var modelMenuButton: MaterialButton
+    private lateinit var languageMenuButton: MaterialButton
 
     private var selectedModel: SttModelProfile = SttModelProfile.default
     private var engine: WhisperSttEngine? = null
@@ -65,14 +66,14 @@ class MainActivity : android.app.Activity() {
 
         modelMenuButton.setOnClickListener { showModelMenu() }
         languageMenuButton.setOnClickListener { showLanguageDialog() }
-        findViewById<Button>(R.id.openAccessibility).setOnClickListener {
+        findViewById<MaterialButton>(R.id.openAccessibility).setOnClickListener {
             showAccessibilityDisclosure()
         }
-        findViewById<Button>(R.id.licenses).setOnClickListener {
+        findViewById<MaterialButton>(R.id.licenses).setOnClickListener {
             startActivity(Intent(this, LicensesActivity::class.java))
         }
         installModelButton.setOnClickListener { installModel() }
-        val toggleInsertMode = findViewById<Button>(R.id.toggleInsertMode)
+        val toggleInsertMode = findViewById<MaterialButton>(R.id.toggleInsertMode)
         val refreshInsertModeLabel = {
             toggleInsertMode.setText(
                 if (InsertMode.load(this) == InsertMode.REPLACE) R.string.mode_replace else R.string.mode_merge,
@@ -84,7 +85,7 @@ class MainActivity : android.app.Activity() {
             refreshInsertModeLabel()
         }
         refreshInsertModeLabel()
-        val togglePartials = findViewById<Button>(R.id.togglePartials)
+        val togglePartials = findViewById<MaterialButton>(R.id.togglePartials)
         val refreshPartialsLabel = {
             togglePartials.setText(
                 if (PartialsSetting.load(this)) R.string.partials_on else R.string.partials_off,
@@ -256,7 +257,7 @@ class MainActivity : android.app.Activity() {
         val languages = SpokenLanguage.entries
         val labels = languages.map(::languageLabel).toTypedArray()
         val checked = languages.map { it in selected }.toBooleanArray()
-        val dialog = AlertDialog.Builder(this)
+        val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.language_selection_title)
             .setMessage(R.string.language_selection_body)
             .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
@@ -395,7 +396,7 @@ class MainActivity : android.app.Activity() {
 
     private fun requestMicrophonePermission() {
         if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
-            AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.microphone_permission_rationale_title)
                 .setMessage(R.string.microphone_permission_rationale)
                 .setNegativeButton(android.R.string.cancel, null)
@@ -409,7 +410,7 @@ class MainActivity : android.app.Activity() {
     }
 
     private fun showAccessibilityDisclosure() {
-        AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle(R.string.accessibility_disclosure_title)
             .setMessage(R.string.accessibility_disclosure_message)
             .setNegativeButton(android.R.string.cancel, null)

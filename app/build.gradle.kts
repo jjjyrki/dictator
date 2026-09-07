@@ -49,6 +49,8 @@ tasks.register("prepareKotlinBuildScriptModel") {
 }
 
 dependencies {
+    implementation("com.google.android.material:material:1.13.0")
+
     testImplementation("junit:junit:4.13.2")
 
     androidTestImplementation("androidx.test:core-ktx:1.6.1")

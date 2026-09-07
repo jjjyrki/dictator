@@ -11,5 +11,9 @@
     <color name="setup_button_tint">#7356B9</color>
     <color name="setup_ok">#7DCEA0</color>
     <color name="setup_warn">#F5B041</color>
+    <color name="setup_error">#FFB4AB</color>
+    <color name="setup_on_error">#690005</color>
+    <color name="setup_error_container">#93000A</color>
+    <color name="setup_on_error_container">#FFDAD6</color>
     <color name="bubble_error">#6C3483</color>
 </resources>

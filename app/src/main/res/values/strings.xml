@@ -18,7 +18,6 @@
     <string name="licenses_button">Open-source licenses</string>
     <string name="licenses_title">Open-source licenses</string>
     <string name="licenses_intro">Dictator uses open-source software and downloads speech models licensed by their authors. These notices are provided for attribution.</string>
-    <string name="licenses_back">Back</string>
     <string name="model_installing">Downloading model files…</string>
     <string name="model_install_progress">%1$d/%2$d: %3$s, %4$d MiB of %5$d MiB</string>
     <string name="model_not_installed">Download a model to get started.</string>

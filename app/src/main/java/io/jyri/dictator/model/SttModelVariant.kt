@@ -51,7 +51,7 @@ enum class SttModelVariant {
                 directoryName = "whisper-acft-base",
                 fileName = "base_acft_q8_0.bin",
                 sizeBytes = 81_768_602,
-                sha256 = "e44f352c9aa2c3609de20c733c4ad4a75c28cd9ab07d005383df55fa96efc4",
+                sha256 = "e44f352c9aa2c3609dece20c733c4ad4a75c28cd9ab07d005383df55fa96efc4",
             )
             SMALL -> SttModelAsset(
                 displayName = "Multilingual · Small · 264 MB · best quality",

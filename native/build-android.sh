@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the whisper.cpp JNI runtime for arm64-v8a and packages it into the
-# app's jniLibs. Usage: native/build-android.sh
+# app's jniLibs. The native library is linked for Android 16 KB page sizes.
+# Usage: native/build-android.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -38,5 +39,12 @@ cmake --build "$BUILD_DIR" --parallel "$(sysctl -n hw.ncpu)" --target dictator_w
 
 mkdir -p "$JNI_LIBS"
 cp "$BUILD_DIR/libdictator_whisper.so" "$JNI_LIBS/"
-STRIP="$(find "$NDK_ROOT/toolchains/llvm/prebuilt" -path '*bin/llvm-strip' | head -n 1)"
-"$STRIP" --strip-unneeded "$JNI_LIBS/libdictator_whisper.so"
+TOOLCHAIN_BIN="$(dirname "$(find "$NDK_ROOT/toolchains/llvm/prebuilt" -path '*bin/llvm-strip' | head -n 1)")"
+"$TOOLCHAIN_BIN/llvm-strip" --strip-unneeded "$JNI_LIBS/libdictator_whisper.so"
+
+if ! "$TOOLCHAIN_BIN/llvm-readelf" -l "$JNI_LIBS/libdictator_whisper.so" | \
+    awk '$1 == "LOAD" { found = 1; if ($NF != "0x4000") invalid = 1 } END { exit !found || invalid }'; then
+  echo "The JNI library is not 16 KB ELF-aligned." >&2
+  "$TOOLCHAIN_BIN/llvm-readelf" -l "$JNI_LIBS/libdictator_whisper.so" >&2
+  exit 1
+fi

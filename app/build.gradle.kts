@@ -17,8 +17,8 @@ android {
         //noinspection OldTargetApi
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 48
-        versionName = "0.9.33"
+        versionCode = 50
+        versionName = "0.9.35"
     }
 
     signingConfigs {

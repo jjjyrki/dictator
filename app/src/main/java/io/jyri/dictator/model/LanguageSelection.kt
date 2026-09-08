@@ -18,6 +18,7 @@ object LanguageSelection {
             ?: return default
         val selected = SpokenLanguage.entries
             .filter { it.whisperCode in stored }
+            .take(SpokenLanguage.MAX_SELECTED_LANGUAGES)
             .toCollection(LinkedHashSet())
         return selected.ifEmpty { default }
     }
@@ -27,6 +28,9 @@ object LanguageSelection {
 
     fun store(context: Context, languages: Set<SpokenLanguage>) {
         require(languages.isNotEmpty()) { "At least one spoken language is required" }
+        require(languages.size <= SpokenLanguage.MAX_SELECTED_LANGUAGES) {
+            "At most ${SpokenLanguage.MAX_SELECTED_LANGUAGES} spoken languages are allowed"
+        }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
             .putStringSet(KEY_CODES, languages.mapTo(linkedSetOf()) { it.whisperCode })

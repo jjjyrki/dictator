@@ -12,7 +12,7 @@ The streaming Zipformer reached RTF 0.1 on the Galaxy S23 but produced disappoin
 
 Runtime: vendored whisper.cpp v1.9.3 (CPU-only ggml subset) built as `libdictator_whisper.so` through `native/build-android.sh` with the NDK CMake toolchain. A small JNI layer (`native/dictator_jni.cpp`) exposes create/transcribe/close. The dictation transcription logic (`native/transcribe.hpp`) is shared with a host compatibility binary.
 
-Engine flow: audio accumulates during the session; `finish()` transcribes the whole clip with greedy sampling and FUTO's ACFT audio-context rule `audio_ctx = min(1500, ceil(samples / 320) + 32)`. English-only models use `language = "en"`. Multilingual models can auto-detect from a user-selected allow-list, currently English and Finnish, and then transcribe with the selected language.
+Engine flow: audio accumulates during the session; `finish()` transcribes the whole clip with greedy sampling and FUTO's ACFT audio-context rule `audio_ctx = min(1500, ceil(samples / 320) + 32)`. English-only models use `language = "en"`. Multilingual models can auto-detect from a user-selected allow-list of up to four languages from Whisper's supported language catalog, and then transcribe with the selected language.
 
 Model: FUTO ACFT fine-tuned Whisper GGML files, all verified against FUTO's own pinned digests and downloadable from `https://voiceinput.futo.org/VoiceInput/`. The app offers a selector:
 
@@ -30,6 +30,6 @@ The pinned model transcribed Kyutai's `bria` fixture on the host through the sha
 ## Consequences
 
 - Transcription happens once at stop; long sessions delay the final text by roughly RTF times the clip length. Partials are a follow-up if needed.
-- The multilingual language detector compares only the selected languages instead of allowing every Whisper language. Detection adds an encoder pass before transcription and needs device benchmarking.
+- The multilingual language detector compares only the selected languages, up to four, instead of allowing every Whisper language. Detection adds an encoder pass before transcription and needs device benchmarking.
 - A transcription call selects one language for the whole clip. Sentence-level code-switching remains a follow-up requiring segmentation or per-segment detection.
 - Thread count (default 4) is the first device tuning knob; the small model remains the quality upgrade path if RTF allows.

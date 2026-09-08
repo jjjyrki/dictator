@@ -24,6 +24,9 @@ data class WhisperLanguageConfig(
             languages: Set<SpokenLanguage>,
         ): WhisperLanguageConfig {
             if (!model.isMultilingual) return fixed(SpokenLanguage.ENGLISH)
+            require(languages.isEmpty() || languages.size <= SpokenLanguage.MAX_SELECTED_LANGUAGES) {
+                "At most ${SpokenLanguage.MAX_SELECTED_LANGUAGES} spoken languages are allowed"
+            }
             val selected = languages.ifEmpty { SpokenLanguage.entries.toSet() }
                 .sortedBy { it.ordinal }
             return if (selected.size == 1) {

@@ -258,7 +258,8 @@ The visible dictation state is intentionally small:
 
 | State | Meaning | Allowed user action | Exit |
 | --- | --- | --- | --- |
-| `Idle` | No active recording or finalization | Tap to start | `Recording` or `Error` |
+| `Idle` | No active recording or finalization | Tap to start | `Recording`, `MicrophonePermissionRequired`, or `Error` |
+| `MicrophonePermissionRequired` | The focused field is usable, but microphone access is missing | Tap to open Dictator and grant access | `Idle` after permission is granted |
 | `Recording` | Microphone is open and audio is flowing | Tap to stop | `Processing`, `Error`, or `Idle` on cancellation |
 | `Processing` | Audio has stopped and the engine is finalizing | No second start; a future cancel action may abort | `Done`, `Error`, or `Idle` |
 | `Done` | Final text was inserted | No action required | Return to `Idle` |
@@ -268,6 +269,8 @@ Required transitions:
 
 ```text
 Idle --tap--> Recording
+Idle --missing microphone access--> MicrophonePermissionRequired
+MicrophonePermissionRequired --permission granted--> Idle
 Recording --tap--> Processing
 Processing --final transcript and insertion success--> Done
 Processing --empty transcript--> Idle

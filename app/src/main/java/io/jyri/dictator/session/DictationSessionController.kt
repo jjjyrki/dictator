@@ -19,6 +19,8 @@ class DictationSessionController(
     private val onLevel: (Float) -> Unit = {},
     private val onPartial: (String) -> Unit = {},
     private val onError: (String) -> Unit = {},
+    private val microphonePermissionGranted: () -> Boolean = { true },
+    private val onMicrophonePermissionRequired: () -> Unit = {},
     private val replaceAll: () -> Boolean = { false },
     private val partialsEnabled: () -> Boolean = { false },
     private val background: Executor = Executor { it.run() },
@@ -29,10 +31,14 @@ class DictationSessionController(
 
     private var captured: TargetSnapshot? = null
     private var session: SpeechSession? = null
+    private var finishingSession: SpeechSession? = null
+    private var operationGeneration = 0L
+    private var pendingReset: Runnable? = null
 
     fun onTap() {
         when (state) {
             DictationState.Idle -> start()
+            DictationState.MicrophonePermissionRequired -> onMicrophonePermissionRequired()
             DictationState.Recording -> stop()
             DictationState.Processing -> Unit
             DictationState.Done, DictationState.Error -> reset()
@@ -40,13 +46,24 @@ class DictationSessionController(
     }
 
     fun reset() {
+        operationGeneration++
+        cancelPendingReset()
         session?.cancel()
+        finishingSession?.cancel()
         session = null
+        finishingSession = null
         captured = null
         publish(DictationState.Idle)
     }
 
     private fun start() {
+        operationGeneration++
+        cancelPendingReset()
+        if (!microphonePermissionGranted()) {
+            publish(DictationState.MicrophonePermissionRequired)
+            onMicrophonePermissionRequired()
+            return
+        }
         val node = resolveFreshNode(null)
         if (node == null || !EditableTarget.isUsable(node)) {
             onError("No editable text field is focused")
@@ -70,7 +87,9 @@ class DictationSessionController(
     private fun stop() {
         val active = session ?: return publish(DictationState.Error)
         val expected = captured
+        val generation = operationGeneration
         session = null
+        finishingSession = active
         publish(DictationState.Processing)
         background.execute {
             var failureMessage: String? = null
@@ -83,10 +102,13 @@ class DictationSessionController(
             val outcome = transcript
                 ?.let { text -> finishTranscript(expected, text) }
                 ?: InsertionOutcome.Failed
-            if (outcome == InsertionOutcome.Failed && failureMessage != null) {
-                onError("Transcription failed: $failureMessage")
+            mainHandler.post {
+                if (generation != operationGeneration || state != DictationState.Processing) return@post
+                if (outcome == InsertionOutcome.Failed && failureMessage != null) {
+                    onError("Transcription failed: $failureMessage")
+                }
+                completeStop(outcome)
             }
-            mainHandler.post { completeStop(outcome) }
         }
     }
 
@@ -103,24 +125,40 @@ class DictationSessionController(
     }
 
     private fun completeStop(outcome: InsertionOutcome?) {
+        finishingSession = null
         captured = null
         when (outcome) {
             null -> publish(DictationState.Idle)
             InsertionOutcome.Direct -> {
                 publish(DictationState.Done)
-                mainHandler.postDelayed({ reset() }, DONE_MS)
+                scheduleReset(DONE_MS)
             }
             InsertionOutcome.ClipboardFallback -> {
                 onError("Couldn't insert the text — it's on the clipboard")
                 publish(DictationState.Done)
-                mainHandler.postDelayed({ reset() }, DONE_MS)
+                scheduleReset(DONE_MS)
             }
             InsertionOutcome.Failed -> {
                 onError("Could not insert the text into the field")
                 publish(DictationState.Error)
-                mainHandler.postDelayed({ reset() }, ERROR_MS)
+                scheduleReset(ERROR_MS)
             }
         }
+    }
+
+    private fun scheduleReset(delayMs: Long) {
+        cancelPendingReset()
+        val generation = operationGeneration
+        pendingReset = Runnable {
+            if (generation != operationGeneration) return@Runnable
+            pendingReset = null
+            reset()
+        }.also { mainHandler.postDelayed(it, delayMs) }
+    }
+
+    private fun cancelPendingReset() {
+        pendingReset?.let { mainHandler.removeCallbacks(it) }
+        pendingReset = null
     }
 
     private fun publish(next: DictationState) {

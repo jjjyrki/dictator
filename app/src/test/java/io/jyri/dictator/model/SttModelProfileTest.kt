@@ -19,6 +19,11 @@ class SttModelProfileTest {
     }
 
     @Test
+    fun everyModelAssetHasACompleteSha256Digest() {
+        assertTrue(SttModelProfile.entries.all { it.asset.sha256.length == 64 })
+    }
+
+    @Test
     fun multilingualAssetsAreDistinctFromEnglishAssets() {
         assertTrue(
             SttModelProfile.MULTILINGUAL_SMALL.asset.fileName.endsWith("_acft_q8_0.bin"),

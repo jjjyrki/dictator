@@ -1,11 +1,14 @@
 package io.jyri.dictator
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.pm.ApplicationInfo
 import android.util.Log
 import android.os.Handler
 import android.os.Looper
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.view.LayoutInflater
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -27,10 +30,15 @@ import io.jyri.dictator.speech.SttEngineHolder
 import io.jyri.dictator.speech.WhisperLanguageConfig
 import io.jyri.dictator.speech.WhisperLiveSpeechEngine
 import io.jyri.dictator.speech.WhisperSttEngine
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class DictationAccessibilityService : AccessibilityService() {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val background: ExecutorService = Executors.newSingleThreadExecutor()
+    private val engineLoadInProgress = AtomicBoolean(false)
+    private val scheduledBubbleRefresh = Runnable { refreshBubble() }
     private val focusRetry = Runnable {
         // Compose can leave findFocus pointing at a stale virtual node after a transition.
         clearCache()
@@ -68,11 +76,14 @@ class DictationAccessibilityService : AccessibilityService() {
             ),
             resolveFreshNode = { expected -> currentEditableFocus(expected?.windowId) },
             onState = { state ->
-                if (state == DictationState.Idle && currentEditableFocus() == null) {
-                    overlay.hide()
+                if (state == DictationState.Idle) {
+                    refreshBubble()
                 } else {
+                    // A focus retry belongs to the idle visibility decision. Do
+                    // not let it run after recording has started and affect the
+                    // next state transition.
+                    mainHandler.removeCallbacks(focusRetry)
                     overlay.show(state)
-                    overlay.update(state)
                 }
             },
             onLevel = { level -> mainHandler.post { bubble?.setLevel(level) } },
@@ -80,8 +91,10 @@ class DictationAccessibilityService : AccessibilityService() {
             onError = { message ->
                 mainHandler.post { Toast.makeText(this, message, Toast.LENGTH_LONG).show() }
             },
+            microphonePermissionGranted = ::hasMicrophonePermission,
+            onMicrophonePermissionRequired = ::openMicrophonePermission,
             replaceAll = { InsertMode.load(this) == InsertMode.REPLACE },
-            background = Executors.newSingleThreadExecutor(),
+            background = background,
         )
         refreshBubble()
     }
@@ -109,32 +122,34 @@ class DictationAccessibilityService : AccessibilityService() {
             }
             return
         }
-        Thread {
-            runCatching {
-                SttEngineHolder.install(
-                    model,
-                    languages,
-                    WhisperSttEngine(
-                        installer.modelFile(),
-                        WhisperLanguageConfig.forModel(model, languages),
-                    ),
-                )
+        if (!engineLoadInProgress.compareAndSet(false, true)) return
+        background.execute {
+            try {
+                runCatching {
+                    SttEngineHolder.install(
+                        model,
+                        languages,
+                        WhisperSttEngine(
+                            installer.modelFile(),
+                            WhisperLanguageConfig.forModel(model, languages),
+                        ),
+                    )
+                }
+            } finally {
+                engineLoadInProgress.set(false)
             }
-        }.start()
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_FOCUSED,
-            AccessibilityEvent.TYPE_VIEW_CLICKED,
-            AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED,
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOWS_CHANGED,
             -> {
                 logFocusDiagnostics(event)
-                refreshBubble()
+                scheduleBubbleRefresh()
             }
             else -> Unit
         }
@@ -166,34 +181,77 @@ class DictationAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {
         controller?.reset()
+        mainHandler.removeCallbacks(scheduledBubbleRefresh)
         mainHandler.removeCallbacks(focusRetry)
         bubble?.hide()
     }
 
     override fun onDestroy() {
         controller?.reset()
+        mainHandler.removeCallbacks(scheduledBubbleRefresh)
         mainHandler.removeCallbacks(focusRetry)
         bubble?.hide()
         bubble = null
         controller = null
+        background.shutdownNow()
         super.onDestroy()
+    }
+
+    private fun scheduleBubbleRefresh() {
+        if (!mainHandler.hasCallbacks(scheduledBubbleRefresh)) {
+            mainHandler.postDelayed(scheduledBubbleRefresh, BUBBLE_REFRESH_DEBOUNCE_MS)
+        }
     }
 
     private fun refreshBubble(allowRetry: Boolean = true) {
         val overlay = bubble ?: return
         val session = controller ?: return
-        if (session.state != DictationState.Idle) return
+        val permissionGranted = hasMicrophonePermission()
+        if (session.state == DictationState.MicrophonePermissionRequired && permissionGranted) {
+            session.reset()
+            return
+        }
+        if (session.state != DictationState.Idle &&
+            session.state != DictationState.MicrophonePermissionRequired
+        ) return
         val node = currentEditableFocus()
         if (node == null) {
-            overlay.hide()
-            // One pending retry; content-event bursts must not postpone it indefinitely.
-            if (allowRetry && !mainHandler.hasCallbacks(focusRetry)) {
-                mainHandler.postDelayed(focusRetry, 150L)
+            if (allowRetry) {
+                // Keep the current bubble through the short period where an app
+                // is rebuilding its accessibility tree. Hide only after a fresh
+                // lookup confirms that focus is really gone.
+                if (!mainHandler.hasCallbacks(focusRetry)) {
+                    mainHandler.postDelayed(focusRetry, FOCUS_RETRY_MS)
+                }
+            } else {
+                overlay.hide()
             }
         } else {
             mainHandler.removeCallbacks(focusRetry)
-            overlay.show(DictationState.Idle)
+            overlay.show(
+                if (permissionGranted) {
+                    DictationState.Idle
+                } else {
+                    DictationState.MicrophonePermissionRequired
+                },
+            )
         }
+    }
+
+    private fun hasMicrophonePermission(): Boolean =
+        checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    private fun openMicrophonePermission() {
+        startActivity(
+            Intent(this, MainActivity::class.java).apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                )
+                putExtra(MainActivity.EXTRA_REQUEST_MICROPHONE_PERMISSION, true)
+            },
+        )
     }
 
     /**
@@ -209,6 +267,11 @@ class DictationAccessibilityService : AccessibilityService() {
             currentEditableFocusIn(window.root)?.let { return it }
         }
         return null
+    }
+
+    private companion object {
+        const val BUBBLE_REFRESH_DEBOUNCE_MS = 50L
+        const val FOCUS_RETRY_MS = 150L
     }
 
     private fun currentEditableFocusIn(root: AccessibilityNodeInfo?): AccessibilityNodeInfo? {

@@ -43,12 +43,13 @@ class BubbleOverlay(
     private var attached = false
     private var expanded = false
     private var lastState: DictationState? = null
-    private var collapsing = false
+    private var transitionGeneration = 0L
     private var cancelScaleAnimator: ObjectAnimator? = null
     private var waveScaleAnimator: ObjectAnimator? = null
     private var cancelFadeAnimator: ObjectAnimator? = null
     private var waveFadeAnimator: ObjectAnimator? = null
     private var processingSpinnerAnimator: ObjectAnimator? = null
+    private var idleButtonResetRunnable: Runnable? = null
     private var dragStartX = 0
     private var dragStartY = 0
     private val density = view.context.resources.displayMetrics.density
@@ -59,7 +60,6 @@ class BubbleOverlay(
     init {
         // The first visible state is always the idle mic with the extras hidden.
         expanded = false
-        collapsing = false
         cancelButton.visibility = View.GONE
         waveChip.visibility = View.GONE
         cancelButton.alpha = 1f
@@ -85,14 +85,18 @@ class BubbleOverlay(
     }
 
     fun show(state: DictationState) {
-        bind(state)
-        if (attached) return
-        windowManager.addView(view, layoutParams())
-        attached = true
+        if (!attached) {
+            // Attach before starting animations so their first frame is not spent
+            // on a detached view. This also gives hiddenOffsetFor() real layout
+            // coordinates as soon as the first frame is rendered.
+            windowManager.addView(view, layoutParams())
+            attached = true
+        }
+        if (state != lastState) bind(state)
     }
 
     fun update(state: DictationState) {
-        if (!attached) return
+        if (!attached || state == lastState) return
         bind(state)
     }
 
@@ -101,15 +105,43 @@ class BubbleOverlay(
     }
 
     fun hide() {
-        if (!attached) return
-        windowManager.removeView(view)
-        attached = false
+        // removeView() does not stop property animators or posted callbacks.
+        // Reset the reusable view before detaching it so a later show starts
+        // from a deterministic idle layout.
+        cancelTransitionAnimations()
+        idleButtonResetRunnable?.let { view.removeCallbacks(it) }
+        idleButtonResetRunnable = null
+        stopProcessingSpinner()
+        acceptButton.animate().cancel()
+        acceptButton.scaleX = 1f
+        acceptButton.scaleY = 1f
+        cancelButton.visibility = View.GONE
+        waveChip.visibility = View.GONE
+        cancelButton.alpha = 1f
+        waveChip.alpha = 1f
+        cancelButton.scaleY = 1f
+        waveChip.scaleY = 1f
+        cancelButton.translationX = 0f
+        waveChip.translationX = 0f
+        waveChipView.setActive(false)
+        row.alpha = 1f
+        expanded = false
+        lastState = null
+        if (attached) {
+            windowManager.removeView(view)
+            attached = false
+        }
     }
 
     private fun bind(state: DictationState) {
         val changed = state != lastState
         lastState = state
-        row.dragEnabled = state == DictationState.Idle
+        if (state != DictationState.Done) {
+            idleButtonResetRunnable?.let { view.removeCallbacks(it) }
+            idleButtonResetRunnable = null
+        }
+        row.dragEnabled = state == DictationState.Idle ||
+            state == DictationState.MicrophonePermissionRequired
         when (state) {
             DictationState.Idle -> {
                 collapse()
@@ -117,6 +149,13 @@ class BubbleOverlay(
                 acceptButton.setBackgroundResource(R.drawable.bubble_idle)
                 setAcceptIcon(R.drawable.dictator, DICTATOR_ICON_DP)
                 rootDescription(R.string.bubble_idle)
+            }
+            DictationState.MicrophonePermissionRequired -> {
+                collapse()
+                stopProcessingSpinner()
+                acceptButton.setBackgroundResource(R.drawable.bubble_permission)
+                setAcceptIcon(R.drawable.ic_bubble_mic_off, STANDARD_ICON_DP)
+                rootDescription(R.string.bubble_microphone_permission_required)
             }
             DictationState.Recording -> {
                 expand()
@@ -155,12 +194,17 @@ class BubbleOverlay(
     }
 
     private fun showIdleButtonAfterCollapse() {
-        view.postDelayed({
-            if (lastState != DictationState.Done) return@postDelayed
+        idleButtonResetRunnable?.let { view.removeCallbacks(it) }
+        val generation = transitionGeneration
+        idleButtonResetRunnable = Runnable {
+            if (generation != transitionGeneration || lastState != DictationState.Done) {
+                return@Runnable
+            }
+            idleButtonResetRunnable = null
             stopProcessingSpinner()
             acceptButton.setBackgroundResource(R.drawable.bubble_idle)
             setAcceptIcon(R.drawable.dictator, DICTATOR_ICON_DP)
-        }, CANCEL_OUT_MS)
+        }.also { view.postDelayed(it, CANCEL_OUT_MS) }
     }
 
     private fun startProcessingSpinner() {
@@ -223,13 +267,7 @@ class BubbleOverlay(
     private fun expand() {
         if (expanded) return
         // A collapse may still be running if the user tapped quickly; take over.
-        collapsing = false
-        cancelButton.animate().cancel()
-        waveChip.animate().cancel()
-        cancelScaleAnimator?.cancel()
-        waveScaleAnimator?.cancel()
-        cancelFadeAnimator?.cancel()
-        waveFadeAnimator?.cancel()
+        cancelTransitionAnimations()
         expanded = true
         cancelButton.visibility = View.VISIBLE
         waveChip.visibility = View.VISIBLE
@@ -257,23 +295,19 @@ class BubbleOverlay(
 
     /** Slides both extras back behind the accept button and hides them. */
     private fun collapse() {
-        if (!expanded || collapsing) return
-        collapsing = true
+        if (!expanded) return
         expanded = false
         waveChipView.setActive(false)
-        cancelScaleAnimator?.cancel()
-        waveScaleAnimator?.cancel()
-        cancelFadeAnimator?.cancel()
-        waveFadeAnimator?.cancel()
+        val generation = cancelTransitionAnimations()
         val interpolator = PathInterpolator(0.4f, 0f, 1f, 1f)
         val hide = { target: View, durationMs: Long ->
             val hidden = hiddenOffsetFor(target)
             target.animate().translationX(hidden)
                 .setInterpolator(interpolator).setDuration(durationMs)
                 .withEndAction {
+                    if (generation != transitionGeneration) return@withEndAction
                     target.visibility = View.GONE
                     target.alpha = 1f
-                    collapsing = false
                 }
                 .start()
         }
@@ -284,6 +318,24 @@ class BubbleOverlay(
         animateExtraScale(cancelButton, EXTRA_MIN_SCALE_Y, CANCEL_OUT_MS / 2)
         animateExtraAlpha(waveChip, 0f, WAVE_OUT_MS * FADE_OUT_NUMERATOR / FADE_OUT_DENOMINATOR, interpolator)
         animateExtraAlpha(cancelButton, 0f, CANCEL_OUT_MS * FADE_OUT_NUMERATOR / FADE_OUT_DENOMINATOR, interpolator)
+    }
+
+    /** Cancels every animation that can mutate the extra controls. */
+    private fun cancelTransitionAnimations(): Long {
+        // Invalidate callbacks before cancelling: ViewPropertyAnimator can still
+        // deliver an end callback after cancel() on some Android releases.
+        transitionGeneration++
+        cancelButton.animate().cancel()
+        waveChip.animate().cancel()
+        cancelScaleAnimator?.cancel()
+        waveScaleAnimator?.cancel()
+        cancelFadeAnimator?.cancel()
+        waveFadeAnimator?.cancel()
+        cancelScaleAnimator = null
+        waveScaleAnimator = null
+        cancelFadeAnimator = null
+        waveFadeAnimator = null
+        return transitionGeneration
     }
 
     private fun animateExtraAlpha(

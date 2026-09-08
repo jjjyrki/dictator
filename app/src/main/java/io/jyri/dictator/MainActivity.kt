@@ -5,17 +5,28 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
 import android.view.View
+import android.view.ViewGroup
 import android.view.accessibility.AccessibilityManager
+import android.widget.CheckBox
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.widget.PopupMenu
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import android.widget.Toast
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import io.jyri.dictator.audio.LiveSttRecorder
 import io.jyri.dictator.insert.InsertMode
 import io.jyri.dictator.model.LanguageSelection
@@ -29,6 +40,7 @@ import io.jyri.dictator.speech.WhisperLanguageConfig
 import io.jyri.dictator.speech.WhisperSttEngine
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 class MainActivity : android.app.Activity() {
     private val background: ExecutorService = Executors.newSingleThreadExecutor()
@@ -41,6 +53,14 @@ class MainActivity : android.app.Activity() {
     private lateinit var transcript: TextView
     private lateinit var recordButton: MaterialButton
     private lateinit var installModelButton: MaterialButton
+    private lateinit var modelDownloadProgress: ProgressBar
+    private lateinit var microphoneStepHeading: View
+    private lateinit var microphoneBanner: View
+    private lateinit var accessibilityStepHeading: View
+    private lateinit var accessibilityStep: View
+    private lateinit var testStepHeading: View
+    private lateinit var testStep: View
+    private lateinit var preferencesSection: View
     private lateinit var modelMenuButton: MaterialButton
     private lateinit var languageMenuButton: MaterialButton
 
@@ -49,17 +69,36 @@ class MainActivity : android.app.Activity() {
     private var recorder: LiveSttRecorder? = null
     private var modelInstallationInProgress = false
     private var modelLoadingInProgress = false
+    private var startSampleAfterPermission = false
+    private var sampleTestCompleted = false
+
+    private val setupPreferences by lazy {
+        getSharedPreferences(SETUP_PREFERENCES, MODE_PRIVATE)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         selectedModel = ModelSelection.load(this)
+        sampleTestCompleted = hasCompletedSampleTest(selectedModel)
         setContentView(R.layout.activity_main)
+        findViewById<View>(R.id.mainContent).applySystemBarInsets()
         modelStatus = findViewById(R.id.modelStatus)
         selectedModelLabel = findViewById(R.id.selectedModel)
         sampleMetrics = findViewById(R.id.sampleMetrics)
         transcript = findViewById(R.id.transcript)
         recordButton = findViewById(R.id.record)
         installModelButton = findViewById(R.id.installModel)
+        modelDownloadProgress = findViewById(R.id.modelDownloadProgress)
+        microphoneStepHeading = findViewById(R.id.microphoneStepHeading)
+        microphoneBanner = findViewById(R.id.microphoneBanner)
+        accessibilityStepHeading = findViewById(R.id.accessibilityStepHeading)
+        accessibilityStep = findViewById(R.id.accessibilityStep)
+        testStepHeading = findViewById(R.id.testStepHeading)
+        testStep = findViewById(R.id.testStep)
+        preferencesSection = findViewById(R.id.preferencesSection)
+        findViewById<MaterialButton>(R.id.microphoneBannerAction).setOnClickListener {
+            openAppSettings()
+        }
         modelMenuButton = findViewById(R.id.modelMenu)
         languageMenuButton = findViewById(R.id.languageMenu)
         modelInstaller = installerFor()
@@ -100,6 +139,13 @@ class MainActivity : android.app.Activity() {
         recordButton.setOnClickListener { toggleRecording() }
         ensureEngineLoaded()
         updateModelControls()
+        handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
     }
 
     override fun onResume() {
@@ -110,8 +156,9 @@ class MainActivity : android.app.Activity() {
             status.setTextColor(getColor(R.color.setup_ok))
         } else {
             status.setText(R.string.accessibility_disabled)
-            status.setTextColor(getColor(R.color.setup_warn))
+            status.setTextColor(getColor(R.color.setup_muted))
         }
+        updateModelControls()
     }
 
     override fun onDestroy() {
@@ -131,15 +178,22 @@ class MainActivity : android.app.Activity() {
             return
         }
         modelInstallationInProgress = true
-        installModelButton.isEnabled = false
-        modelMenuButton.isEnabled = false
-        languageMenuButton.isEnabled = false
+        modelDownloadProgress.progress = 0
+        updateModelControls()
         setModelStatus(getString(R.string.model_installing))
         val installer = modelInstaller
         background.execute {
             runCatching {
                 installer.install { progress ->
                     mainHandler.post {
+                        val percent = if (progress.totalBytes > 0) {
+                            (progress.downloadedBytes * 100L / progress.totalBytes)
+                                .toInt()
+                                .coerceIn(0, 100)
+                        } else {
+                            0
+                        }
+                        modelDownloadProgress.setProgress(percent, true)
                         setModelStatus(
                             getString(
                                 R.string.model_install_progress,
@@ -155,14 +209,15 @@ class MainActivity : android.app.Activity() {
             }.onSuccess {
                 mainHandler.post {
                     modelInstallationInProgress = false
+                    updateModelControls()
                     setModelStatus(getString(R.string.model_installed))
                     loadSelectedModel()
                 }
             }.onFailure { error ->
                 mainHandler.post {
                     modelInstallationInProgress = false
-                    setModelStatus(getString(R.string.model_error, error.message ?: error.javaClass.simpleName))
                     updateModelControls()
+                    setModelStatus(getString(R.string.model_error, error.message ?: error.javaClass.simpleName))
                 }
             }
         }
@@ -194,6 +249,7 @@ class MainActivity : android.app.Activity() {
         }
         unloadCurrentEngine()
         modelLoadingInProgress = true
+        updateModelControls()
         setModelStatus(getString(R.string.model_loading))
         background.execute {
             runCatching {
@@ -220,8 +276,8 @@ class MainActivity : android.app.Activity() {
             }.onFailure { error ->
                 mainHandler.post {
                     modelLoadingInProgress = false
-                    setModelStatus(getString(R.string.model_error, error.message ?: error.javaClass.simpleName))
                     updateModelControls()
+                    setModelStatus(getString(R.string.model_error, error.message ?: error.javaClass.simpleName))
                 }
             }
         }
@@ -255,21 +311,123 @@ class MainActivity : android.app.Activity() {
         }
         val selected = activeLanguages().toMutableSet()
         val languages = SpokenLanguage.entries
-        val labels = languages.map(::languageLabel).toTypedArray()
-        val checked = languages.map { it in selected }.toBooleanArray()
+        val searchInput = TextInputEditText(this).apply {
+            id = R.id.languageSearch
+            inputType = InputType.TYPE_CLASS_TEXT
+            isSingleLine = true
+        }
+        val searchField = TextInputLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+            hint = getString(R.string.language_selection_search_hint)
+            addView(searchInput)
+        }
+        val languageList = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val languageScroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(
+                languageList,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(searchField)
+            addView(
+                languageScroll,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(360),
+                ).apply {
+                    topMargin = dp(8)
+                },
+            )
+        }
+        var refreshDoneButton: (() -> Unit)? = null
+
+        fun renderLanguages(query: String) {
+            languageList.removeAllViews()
+            val normalizedQuery = query.trim()
+            val matches = languages.filter { language ->
+                normalizedQuery.isBlank() ||
+                    language.displayName.contains(normalizedQuery, ignoreCase = true) ||
+                    language.whisperCode.contains(normalizedQuery, ignoreCase = true)
+            }
+            if (matches.isEmpty()) {
+                languageList.addView(
+                    TextView(this).apply {
+                        setText(R.string.language_selection_no_matches)
+                        setTextColor(getColor(R.color.setup_muted))
+                        setPadding(dp(16), dp(16), dp(16), dp(16))
+                    },
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+                return
+            }
+            matches.forEach { language ->
+                val checkbox = CheckBox(this).apply {
+                    text = languageLabel(language)
+                    isChecked = language in selected
+                    minHeight = dp(48)
+                }
+                checkbox.setOnCheckedChangeListener { button, isChecked ->
+                    when {
+                        isChecked && language !in selected &&
+                            selected.size >= SpokenLanguage.MAX_SELECTED_LANGUAGES -> {
+                            button.isChecked = false
+                            Toast.makeText(
+                                this,
+                                R.string.language_selection_maximum,
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                        isChecked -> selected += language
+                        else -> selected -= language
+                    }
+                    refreshDoneButton?.invoke()
+                }
+                languageList.addView(
+                    checkbox,
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+            }
+        }
+
+        renderLanguages("")
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                renderLanguages(s?.toString().orEmpty())
+            }
+
+            override fun afterTextChanged(s: Editable?) = Unit
+        })
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.language_selection_title)
-            .setMessage(R.string.language_selection_body)
-            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
-                val language = languages[which]
-                if (isChecked) selected += language else selected -= language
-            }
+            .setView(content)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.done, null)
             .create()
+        refreshDoneButton = {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = selected.isNotEmpty()
+        }
         dialog.setOnShowListener {
+            refreshDoneButton?.invoke()
             val done = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            done.isEnabled = selected.isNotEmpty()
             done.setOnClickListener {
                 if (selected.isEmpty()) {
                     Toast.makeText(this, R.string.language_selection_requires_one, Toast.LENGTH_SHORT).show()
@@ -289,6 +447,7 @@ class MainActivity : android.app.Activity() {
             return
         }
         selectedModel = model
+        sampleTestCompleted = hasCompletedSampleTest(model)
         ModelSelection.store(this, model)
         unloadCurrentEngine()
         val installer = installerFor(model)
@@ -320,7 +479,7 @@ class MainActivity : android.app.Activity() {
         val active = recorder
         if (active == null) {
             if (!hasMicrophonePermission()) {
-                requestMicrophonePermission()
+                requestMicrophonePermission(startSampleAfterPermission = true)
                 return
             }
             startRecording()
@@ -368,6 +527,10 @@ class MainActivity : android.app.Activity() {
                         result.inferenceSeconds,
                     )
                     recordButton.setText(R.string.start_recording)
+                    sampleTestCompleted = true
+                    setupPreferences.edit()
+                        .putString(TESTED_MODEL_KEY, selectedModel.name)
+                        .apply()
                     updateModelControls()
                 }
             }.onFailure { error ->
@@ -387,14 +550,27 @@ class MainActivity : android.app.Activity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != REQUEST_RECORD_AUDIO) return
-        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
-            startRecording()
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        val startSample = startSampleAfterPermission
+        startSampleAfterPermission = false
+        if (granted) {
+            if (startSample) startRecording() else updateModelControls()
         } else {
             setModelStatus(getString(R.string.microphone_permission_denied))
+            updateModelControls()
         }
     }
 
-    private fun requestMicrophonePermission() {
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_REQUEST_MICROPHONE_PERMISSION, false) != true) return
+        intent.removeExtra(EXTRA_REQUEST_MICROPHONE_PERMISSION)
+        if (hasMicrophonePermission()) return
+        setModelStatus(getString(R.string.microphone_permission_required))
+        requestMicrophonePermission(startSampleAfterPermission = false)
+    }
+
+    private fun requestMicrophonePermission(startSampleAfterPermission: Boolean) {
+        this.startSampleAfterPermission = startSampleAfterPermission
         if (shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO)) {
             MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.microphone_permission_rationale_title)
@@ -430,17 +606,54 @@ class MainActivity : android.app.Activity() {
             languageMenuButton.text = getString(R.string.selected_languages, languageSummary(languages))
         }
         val busy = modelInstallationInProgress || modelLoadingInProgress
+        installModelButton.visibility = if (!busy && engine == null) View.VISIBLE else View.GONE
+        modelDownloadProgress.visibility =
+            if (modelInstallationInProgress) View.VISIBLE else View.GONE
         installModelButton.isEnabled = !busy && recorder == null && engine == null
         installModelButton.setText(if (installed) R.string.load_model else R.string.install_model)
         modelMenuButton.isEnabled = !busy && recorder == null
         languageMenuButton.isEnabled = !busy && recorder == null
         recordButton.isEnabled = !busy && engine != null && recorder == null
+        updateSetupSteps(installed)
         if (busy || recorder != null) return
         when {
             engine != null -> setModelStatus(getString(R.string.model_ready))
             installed -> setModelStatus(getString(R.string.model_installed))
             else -> setModelStatus(getString(R.string.model_not_installed))
         }
+    }
+
+    private fun updateSetupSteps(modelDownloaded: Boolean) {
+        val microphoneGranted = hasMicrophonePermission()
+        val accessibilityEnabled = isOverlayServiceEnabled()
+        val showMicrophoneStep = modelDownloaded && !microphoneGranted
+        val showAccessibilityStep = modelDownloaded && microphoneGranted
+        val showTestStep = showAccessibilityStep && accessibilityEnabled
+
+        microphoneStepHeading.visibility =
+            if (showMicrophoneStep) View.VISIBLE else View.GONE
+        microphoneBanner.visibility =
+            if (showMicrophoneStep) View.VISIBLE else View.GONE
+        accessibilityStepHeading.visibility =
+            if (showAccessibilityStep) View.VISIBLE else View.GONE
+        accessibilityStep.visibility =
+            if (showAccessibilityStep) View.VISIBLE else View.GONE
+        testStepHeading.visibility = if (showTestStep) View.VISIBLE else View.GONE
+        testStep.visibility = if (showTestStep) View.VISIBLE else View.GONE
+        preferencesSection.visibility =
+            if (showTestStep && sampleTestCompleted) View.VISIBLE else View.GONE
+    }
+
+    private fun hasCompletedSampleTest(model: SttModelProfile): Boolean =
+        setupPreferences.getString(TESTED_MODEL_KEY, null) == model.name
+
+    private fun openAppSettings() {
+        startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:$packageName"),
+            ),
+        )
     }
 
     private fun activeLanguages(): Set<SpokenLanguage> =
@@ -451,16 +664,13 @@ class MainActivity : android.app.Activity() {
             .filter { it in languages }
             .joinToString(", ", transform = ::languageLabel)
 
-    private fun languageLabel(language: SpokenLanguage): String =
-        getString(
-            when (language) {
-                SpokenLanguage.ENGLISH -> R.string.language_english
-                SpokenLanguage.FINNISH -> R.string.language_finnish
-            },
-        )
+    private fun languageLabel(language: SpokenLanguage): String = language.displayName
 
     private fun installerFor(model: SttModelProfile = selectedModel): SttModelInstaller =
         SttModelInstaller(this, model.asset)
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).roundToInt()
 
     private fun setModelStatus(value: String) {
         modelStatus.text = value
@@ -482,8 +692,12 @@ class MainActivity : android.app.Activity() {
         }
     }
 
-    private companion object {
-        const val REQUEST_RECORD_AUDIO = 1
-        const val BYTES_PER_MEBIBYTE = 1024L * 1024L
+    companion object {
+        const val EXTRA_REQUEST_MICROPHONE_PERMISSION =
+            "io.jyri.dictator.request_microphone_permission"
+        private const val REQUEST_RECORD_AUDIO = 1
+        private const val BYTES_PER_MEBIBYTE = 1024L * 1024L
+        private const val SETUP_PREFERENCES = "setup_progress"
+        private const val TESTED_MODEL_KEY = "tested_model"
     }
 }

@@ -20,6 +20,12 @@ target_compile_definitions(whisper PRIVATE WHISPER_VERSION="1.9.3")
 add_library(dictator_whisper SHARED dictator_jni.cpp)
 target_include_directories(dictator_whisper PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(dictator_whisper PRIVATE whisper)
+if(ANDROID)
+    # Android 16 KB page-size devices require 16 KB ELF LOAD alignment.
+    target_link_options(dictator_whisper PRIVATE
+        "-Wl,-z,max-page-size=16384"
+        "-Wl,-z,common-page-size=16384")
+endif()
 
 add_executable(transcribe_fixture_host host_main.cpp)
 target_include_directories(transcribe_fixture_host PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

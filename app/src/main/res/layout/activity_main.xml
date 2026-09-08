@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView
+    android:id="@+id/mainContent"
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:clipToPadding="false"
     android:fillViewport="true"
+    android:scrollbars="none"
     android:paddingStart="20dp"
     android:paddingTop="8dp"
     android:paddingEnd="20dp"
@@ -13,6 +16,8 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
         android:orientation="vertical">
 
         <com.google.android.material.appbar.MaterialToolbar
@@ -21,6 +26,8 @@
             android:layout_height="wrap_content"
             android:background="@android:color/transparent"
             android:minHeight="?attr/actionBarSize"
+            app:logo="@drawable/dictator_white"
+            app:logoDescription="@string/app_name"
             app:subtitle="@string/app_tagline"
             app:subtitleTextColor="@color/setup_muted"
             app:title="@string/app_name"
@@ -43,26 +50,6 @@
             android:text="@string/setup_body"
             android:textColor="@color/setup_muted"
             android:textSize="16sp" />
-
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardBackgroundColor="@color/setup_surface"
-            app:cardCornerRadius="18dp"
-            app:cardElevation="0dp"
-            app:strokeColor="@color/setup_accent"
-            app:strokeWidth="1dp">
-
-            <com.google.android.material.textview.MaterialTextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="14dp"
-                android:text="@string/privacy_note"
-                android:textColor="@color/setup_accent_soft"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-        </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.textview.MaterialTextView
             android:layout_width="match_parent"
@@ -140,6 +127,19 @@
                     app:backgroundTint="@color/setup_accent"
                     app:cornerRadius="16dp" />
 
+                <ProgressBar
+                    android:id="@+id/modelDownloadProgress"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:contentDescription="@string/model_download_progress_description"
+                    android:indeterminate="false"
+                    android:max="100"
+                    android:progress="0"
+                    android:progressTint="@color/setup_accent"
+                    android:visibility="gone" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/languageMenu"
                     android:layout_width="match_parent"
@@ -157,6 +157,59 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/microphoneStepHeading"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:letterSpacing="0.06"
+            android:text="@string/setup_step_microphone"
+            android:textColor="@color/setup_accent_soft"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:visibility="gone" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/microphoneBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/setup_warn"
+            app:cardCornerRadius="18dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <com.google.android.material.textview.MaterialTextView
+                    android:id="@+id/microphoneBannerMessage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/microphone_banner_message"
+                    android:textColor="@color/setup_bg"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/microphoneBannerAction"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:minHeight="48dp"
+                    android:text="@string/microphone_banner_action"
+                    android:textAllCaps="false"
+                    android:textColor="@color/setup_warn"
+                    app:backgroundTint="@color/setup_bg"
+                    app:cornerRadius="14dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/accessibilityStepHeading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
@@ -164,10 +217,13 @@
             android:text="@string/setup_step_accessibility"
             android:textColor="@color/setup_accent_soft"
             android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/accessibilityStep"
             android:layout_width="match_parent"
+            android:visibility="gone"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             app:cardBackgroundColor="@color/setup_surface"
@@ -186,7 +242,7 @@
                     android:id="@+id/accessibilityStatus"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/setup_warn"
+                    android:textColor="@color/setup_muted"
                     android:textSize="17sp"
                     android:textStyle="bold" />
 
@@ -214,6 +270,7 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/testStepHeading"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="28dp"
@@ -221,10 +278,13 @@
             android:text="@string/setup_step_test"
             android:textColor="@color/setup_accent_soft"
             android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:visibility="gone" />
 
         <com.google.android.material.card.MaterialCardView
+            android:id="@+id/testStep"
             android:layout_width="match_parent"
+            android:visibility="gone"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             app:cardBackgroundColor="@color/setup_surface"
@@ -302,17 +362,24 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <com.google.android.material.textview.MaterialTextView
+        <LinearLayout
+            android:id="@+id/preferencesSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
-            android:letterSpacing="0.06"
-            android:text="@string/preferences_title"
-            android:textColor="@color/setup_accent_soft"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:orientation="vertical"
+            android:visibility="gone">
 
-        <com.google.android.material.card.MaterialCardView
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:letterSpacing="0.06"
+                android:text="@string/preferences_title"
+                android:textColor="@color/setup_accent_soft"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
@@ -361,30 +428,31 @@
                     app:strokeColor="@color/setup_border"
                     app:strokeWidth="1dp" />
             </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
+            </com.google.android.material.card.MaterialCardView>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/licenses"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:minHeight="52dp"
-            android:text="@string/licenses_button"
-            android:textAllCaps="false"
-            android:textColor="@color/setup_accent_soft"
-            app:backgroundTint="@color/setup_surface"
-            app:cornerRadius="16dp"
-            app:strokeColor="@color/setup_border"
-            app:strokeWidth="1dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/licenses"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:minHeight="52dp"
+                android:text="@string/licenses_button"
+                android:textAllCaps="false"
+                android:textColor="@color/setup_accent_soft"
+                app:backgroundTint="@color/setup_surface"
+                app:cornerRadius="16dp"
+                app:strokeColor="@color/setup_border"
+                app:strokeWidth="1dp" />
 
-        <com.google.android.material.textview.MaterialTextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:gravity="center"
-            android:lineSpacingExtra="2dp"
-            android:text="@string/privacy_footer"
-            android:textColor="@color/setup_muted"
-            android:textSize="13sp" />
+            <com.google.android.material.textview.MaterialTextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:gravity="center"
+                android:lineSpacingExtra="2dp"
+                android:text="@string/privacy_footer"
+                android:textColor="@color/setup_muted"
+                android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>

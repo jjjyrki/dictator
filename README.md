@@ -31,7 +31,9 @@ native/build-android.sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Open Dictator and tap **Model** to choose an English-only or multilingual tiny, base, or small model. For a multilingual model, tap **Select spoken languages** and choose the languages Whisper may consider; English and Finnish are currently supported. Select an installed model to load it; for a model marked not installed, choose it first and tap **Download model**. Then record a short sentence. The app shows the transcript and keeps the audio and inference duration in **Last test**. Do not enable or use the overlay as the acceptance test yet.
+`native/build-android.sh` links the JNI library with 16 KB ELF page alignment and verifies its `LOAD` segments, so rebuilt APKs support Android devices using 16 KB pages.
+
+Open Dictator and tap **Model** to choose an English-only or multilingual tiny, base, or small model. For a multilingual model, tap **Select spoken languages** and choose up to four languages from Whisper's supported language list. Select an installed model to load it; for a model marked not installed, choose it first and tap **Download model**. Then record a short sentence. The app shows the transcript and keeps the audio and inference duration in **Last test**. Do not enable or use the overlay as the acceptance test yet.
 
 ## Run the ADB UI tests
 

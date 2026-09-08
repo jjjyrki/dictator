@@ -18,6 +18,30 @@ class WhisperLanguageConfigTest {
     }
 
     @Test
+    fun multilingualModelUsesAutoDetectionForFourSelectedLanguages() {
+        val config = WhisperLanguageConfig.forModel(
+            SttModelProfile.MULTILINGUAL_SMALL,
+            setOf(
+                SpokenLanguage.ENGLISH,
+                SpokenLanguage.CHINESE,
+                SpokenLanguage.FINNISH,
+                SpokenLanguage.CANTONESE,
+            ),
+        )
+
+        assertEquals("auto", config.language)
+        assertEquals(listOf("en", "zh", "fi", "yue"), config.allowedLanguageCodes)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun multilingualModelRejectsMoreThanFourSelectedLanguages() {
+        WhisperLanguageConfig.forModel(
+            SttModelProfile.MULTILINGUAL_SMALL,
+            SpokenLanguage.entries.take(5).toSet(),
+        )
+    }
+
+    @Test
     fun oneSelectedMultilingualLanguageUsesExplicitLanguage() {
         val config = WhisperLanguageConfig.forModel(
             SttModelProfile.MULTILINGUAL_SMALL,

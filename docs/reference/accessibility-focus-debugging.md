@@ -33,8 +33,9 @@ adb shell setprop log.tag.DictatorFocus INFO
 
 Focus resolution refreshes the input-focus node, then searches at most 128 nodes
 in that window for a usable node carrying actual input focus. The existing
-accessibility-focus fallback remains. If no target is found, the bubble hides
-immediately and retries once after 150 ms with the accessibility cache cleared.
+accessibility-focus fallback remains. If no target is found, the bubble stays
+attached briefly while the tree settles, then hides after one 150 ms retry with
+the accessibility cache cleared.
 No old target is retained. A tree larger than the search budget may still miss
 its focused field. If focus resolves to the keyboard, inspect window ownership
 before broadening the search to other windows.

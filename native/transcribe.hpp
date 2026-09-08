@@ -23,8 +23,7 @@ inline std::string transcribeDictation(
         return std::string();
     }
 
-    whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_BEAM_SEARCH);
-    params.beam_search.beam_size = 5;
+    whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     params.print_progress = false;
     params.print_special = false;
     params.print_realtime = false;

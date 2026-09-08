@@ -41,6 +41,9 @@ private class LiveSession(
     private var levelListener: ((Float) -> Unit)? = null
     private var partialListener: ((String) -> Unit)? = null
     private var lastPartial = ""
+    private var lastPartialSamples = 0
+    @Volatile
+    private var latestRms = 0f
     private val capturing = AtomicBoolean(true)
     private val captureThread = Thread(::captureLoop, "dictator-live-capture")
     private val partialThread = if (partialsEnabled) Thread(::partialLoop, "dictator-live-partial") else null
@@ -86,8 +89,17 @@ private class LiveSession(
         while (capturing.get()) {
             Thread.sleep(PARTIAL_INTERVAL_MS)
             if (!capturing.get()) break
+            if (latestRms < PARTIAL_SILENCE_RMS) continue
             val clip = synchronized(bufferLock) {
-                if (bufferedSamples < MIN_PARTIAL_SAMPLES) null else buffer.copyOf(bufferedSamples)
+                when {
+                    bufferedSamples < MIN_PARTIAL_SAMPLES -> null
+                    bufferedSamples == lastPartialSamples -> null
+                    else -> {
+                        lastPartialSamples = bufferedSamples
+                        val start = (bufferedSamples - MAX_PARTIAL_SAMPLES).coerceAtLeast(0)
+                        buffer.copyOfRange(start, bufferedSamples)
+                    }
+                }
             } ?: continue
             // A partial failure must not kill the session; the final
             // transcription at finish is the source of truth.
@@ -126,6 +138,7 @@ private class LiveSession(
                     sumSquares += sample.toDouble() * sample.toDouble()
                 }
                 val rms = sqrt(sumSquares / count)
+                latestRms = rms.toFloat()
                 levelListener?.invoke(rms.toFloat() * LEVEL_GAIN)
                 synchronized(bufferLock) {
                     if (capturing.get()) {
@@ -183,5 +196,10 @@ private class LiveSession(
         const val PARTIAL_INTERVAL_MS = 1_500L
         // Whisper needs at least about a second of audio to say anything.
         const val MIN_PARTIAL_SAMPLES = 16_000
+        // Keep opt-in partial inference bounded; final transcription still uses
+        // the complete recording.
+        const val MAX_PARTIAL_SAMPLES = 16_000 * 30
+        // Match the quiet-room gate used by the waveform, before its visual gain.
+        const val PARTIAL_SILENCE_RMS = 0.005f
     }
 }

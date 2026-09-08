@@ -10,7 +10,9 @@ import android.content.Context
 object PartialsSetting {
     private const val PREFS = "partials"
     private const val KEY_ENABLED = "enabled"
-    private const val DEFAULT = true
+    // Partial transcription reruns Whisper while recording and is intentionally
+    // opt-in because it has a much higher CPU and battery cost than final text.
+    private const val DEFAULT = false
 
     fun load(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

@@ -36,7 +36,7 @@ class WaveChipView(context: Context, attrs: AttributeSet? = null) : View(context
             }
             smoothedLive = 0f
         }
-        postInvalidateOnAnimation()
+        postInvalidateDelayed(FRAME_INTERVAL_MS)
     }
 
     /** Raw microphone RMS, expected roughly 0..1 after gain. */
@@ -52,7 +52,7 @@ class WaveChipView(context: Context, attrs: AttributeSet? = null) : View(context
         }
         System.arraycopy(levels, 0, levels, 1, levels.size - 1)
         levels[levels.size - 1] = smoothedLive
-        postInvalidateOnAnimation()
+        postInvalidateDelayed(FRAME_INTERVAL_MS)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -89,7 +89,7 @@ class WaveChipView(context: Context, attrs: AttributeSet? = null) : View(context
             )
             x += barWidth + gap
         }
-        if (live) postInvalidateOnAnimation()
+        if (live) postInvalidateDelayed(FRAME_INTERVAL_MS)
     }
 
     private companion object {
@@ -101,7 +101,9 @@ class WaveChipView(context: Context, attrs: AttributeSet? = null) : View(context
         const val RELEASE = 0.22f
         // Above the 18x-gained quiet-room floor, well below normal speech.
         const val NOISE_GATE = 0.08f
-        // Per-second easing rate; ~60 fps frames glide between 10 Hz level updates.
+        // The microphone level arrives at ~10 Hz; 30 fps is enough for the
+        // cosmetic easing while avoiding unnecessary display wakeups.
+        const val FRAME_INTERVAL_MS = 33L
         const val EASE_RATE = 18f
     }
 }

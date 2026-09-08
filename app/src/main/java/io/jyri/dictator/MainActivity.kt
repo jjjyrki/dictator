@@ -74,16 +74,10 @@ class MainActivity : android.app.Activity() {
     private var modelInstallationInProgress = false
     private var modelLoadingInProgress = false
     private var startSampleAfterPermission = false
-    private var sampleTestCompleted = false
-
-    private val setupPreferences by lazy {
-        getSharedPreferences(SETUP_PREFERENCES, MODE_PRIVATE)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         selectedModel = ModelSelection.load(this)
-        sampleTestCompleted = hasCompletedSampleTest(selectedModel)
         setContentView(R.layout.activity_main)
         findViewById<View>(R.id.mainContent).applySystemBarInsets()
         modelStatus = findViewById(R.id.modelStatus)
@@ -563,7 +557,6 @@ class MainActivity : android.app.Activity() {
             return
         }
         selectedModel = model
-        sampleTestCompleted = hasCompletedSampleTest(model)
         ModelSelection.store(this, model)
         unloadCurrentEngine()
         val installer = installerFor(model)
@@ -656,10 +649,6 @@ class MainActivity : android.app.Activity() {
                         result.inferenceSeconds,
                     )
                     recordButton.setText(R.string.start_recording)
-                    sampleTestCompleted = true
-                    setupPreferences.edit()
-                        .putString(TESTED_MODEL_KEY, selectedModel.name)
-                        .apply()
                     updateModelControls()
                 }
             }.onFailure { error ->
@@ -769,12 +758,9 @@ class MainActivity : android.app.Activity() {
             if (showAccessibilityStep) View.VISIBLE else View.GONE
         testStepHeading.visibility = if (showTestStep) View.VISIBLE else View.GONE
         testStep.visibility = if (showTestStep) View.VISIBLE else View.GONE
-        preferencesSection.visibility =
-            if (showTestStep && sampleTestCompleted) View.VISIBLE else View.GONE
+        // Preferences and licenses are available independently of setup progress.
+        preferencesSection.visibility = View.VISIBLE
     }
-
-    private fun hasCompletedSampleTest(model: SttModelProfile): Boolean =
-        setupPreferences.getString(TESTED_MODEL_KEY, null) == model.name
 
     private fun openAppSettings() {
         startActivity(
@@ -826,7 +812,5 @@ class MainActivity : android.app.Activity() {
             "io.jyri.dictator.request_microphone_permission"
         private const val REQUEST_RECORD_AUDIO = 1
         private const val BYTES_PER_MEBIBYTE = 1024L * 1024L
-        private const val SETUP_PREFERENCES = "setup_progress"
-        private const val TESTED_MODEL_KEY = "tested_model"
     }
 }

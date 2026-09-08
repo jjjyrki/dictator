@@ -78,6 +78,7 @@ class MainActivityInstrumentationTest {
             R.id.testStep,
             R.id.preferencesSection,
             R.id.modelDownloadProgress,
+            R.id.selectedModelUsage,
             R.id.modelMenu,
             R.id.installModel,
             R.id.record,

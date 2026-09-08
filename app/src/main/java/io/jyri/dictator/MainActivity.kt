@@ -52,6 +52,7 @@ class MainActivity : android.app.Activity() {
     private lateinit var modelInstaller: SttModelInstaller
     private lateinit var modelStatus: TextView
     private lateinit var selectedModelLabel: TextView
+    private lateinit var selectedModelUsage: TextView
     private lateinit var sampleMetrics: TextView
     private lateinit var transcript: TextView
     private lateinit var recordButton: MaterialButton
@@ -82,6 +83,7 @@ class MainActivity : android.app.Activity() {
         findViewById<View>(R.id.mainContent).applySystemBarInsets()
         modelStatus = findViewById(R.id.modelStatus)
         selectedModelLabel = findViewById(R.id.selectedModel)
+        selectedModelUsage = findViewById(R.id.selectedModelUsage)
         sampleMetrics = findViewById(R.id.sampleMetrics)
         transcript = findViewById(R.id.transcript)
         recordButton = findViewById(R.id.record)
@@ -718,7 +720,16 @@ class MainActivity : android.app.Activity() {
         modelInstaller = installerFor()
         val installed = modelInstaller.isInstalled()
         val languages = activeLanguages()
-        selectedModelLabel.text = getString(R.string.selected_model, modelInstaller.displayName())
+        selectedModelLabel.text = getString(
+            R.string.selected_model_title,
+            selectedModel.asset.modelName,
+            selectedModel.asset.sizeLabel,
+        )
+        selectedModelUsage.text = getString(
+            R.string.selected_model_usage,
+            selectedModel.asset.languageName,
+            selectedModel.asset.usageDescription,
+        )
         languageMenuButton.visibility = if (selectedModel.isMultilingual) View.VISIBLE else View.GONE
         if (selectedModel.isMultilingual) {
             languageMenuButton.text = getString(R.string.selected_languages, languageSummary(languages))

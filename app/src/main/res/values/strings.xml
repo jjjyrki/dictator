@@ -28,7 +28,9 @@
     <string name="model_selection_title">Choose a speech model</string>
     <string name="model_menu_option">%1$s, %2$s, %3$s</string>
     <string name="model_menu_selected">%1$s, %2$s, %3$s, selected</string>
-    <string name="selected_model">Selected: %1$s</string>
+    <string name="selected_model_title">%1$s · %2$s</string>
+    <string name="selected_model_usage">%1$s · %2$s</string>
+    <string name="selected_model_marker_description">Selected model</string>
     <string name="start_recording">Record a sample</string>
     <string name="stop_recording">Stop and transcribe</string>
     <string name="recording_starting">Starting microphone…</string>

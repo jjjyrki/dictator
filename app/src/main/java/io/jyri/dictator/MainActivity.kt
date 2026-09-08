@@ -5,6 +5,8 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -13,6 +15,7 @@ import android.provider.Settings
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityManager
@@ -22,7 +25,6 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.widget.PopupMenu
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
@@ -292,23 +294,131 @@ class MainActivity : android.app.Activity() {
     }
 
     private fun showModelMenu() {
-        val popup = PopupMenu(this, modelMenuButton)
-        popup.menuInflater.inflate(R.menu.model_menu, popup.menu)
-        modelMenuItems().forEach { (model, itemId) ->
-            val item = popup.menu.findItem(itemId)
-            val installed = SttModelInstaller(this, model.asset).isInstalled()
-            item.title = getString(
-                if (installed) R.string.model_menu_installed else R.string.model_menu_not_installed,
-                model.displayName,
+        if (modelInstallationInProgress || modelLoadingInProgress || recorder != null) return
+
+        val modelList = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), 0, dp(8), 0)
+        }
+        val modelsByLanguage = modelMenuModels().groupBy { it.asset.languageName }
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+        modelsByLanguage.entries.forEachIndexed { groupIndex, (language, models) ->
+            if (groupIndex > 0) {
+                modelList.addView(
+                    View(this).apply { setBackgroundColor(getColor(R.color.setup_border)) },
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        dp(1),
+                    ).apply {
+                        topMargin = dp(8)
+                        bottomMargin = dp(8)
+                    },
+                )
+            }
+            modelList.addView(
+                TextView(this).apply {
+                    text = language
+                    setTextColor(getColor(R.color.setup_accent_soft))
+                    textSize = 12f
+                    typeface = Typeface.DEFAULT_BOLD
+                    setPadding(dp(4), dp(4), dp(4), dp(4))
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
             )
+            models.forEach { model ->
+                val selected = model == selectedModel
+                val title = "${model.asset.modelName} · ${model.asset.sizeLabel}"
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    isClickable = true
+                    isFocusable = true
+                    minimumHeight = dp(52)
+                    setPadding(dp(12), dp(6), dp(12), dp(6))
+                    background = modelRowBackground(selected)
+                    contentDescription = getString(
+                        if (selected) R.string.model_menu_selected else R.string.model_menu_option,
+                        language,
+                        title,
+                        model.asset.usageDescription,
+                    )
+                }
+                val labels = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER_VERTICAL
+                }
+                labels.addView(
+                    TextView(this).apply {
+                        text = title
+                        setTextColor(getColor(if (selected) R.color.setup_bg else R.color.setup_text))
+                        textSize = 16f
+                        typeface = Typeface.DEFAULT_BOLD
+                    },
+                )
+                labels.addView(
+                    TextView(this).apply {
+                        text = model.asset.usageDescription
+                        setTextColor(getColor(if (selected) R.color.setup_bg else R.color.setup_muted))
+                        textSize = 12f
+                    },
+                )
+                row.addView(
+                    labels,
+                    LinearLayout.LayoutParams(
+                        0,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        1f,
+                    ),
+                )
+                row.addView(
+                    TextView(this).apply {
+                        text = "✓"
+                        setTextColor(getColor(R.color.setup_bg))
+                        textSize = 18f
+                        visibility = if (selected) View.VISIBLE else View.INVISIBLE
+                    },
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+                row.setOnClickListener {
+                    selectModel(model)
+                    dialog?.dismiss()
+                }
+                modelList.addView(
+                    row,
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { topMargin = dp(4) },
+                )
+            }
         }
-        popup.setOnMenuItemClickListener { item ->
-            val model = modelMenuItems().firstOrNull { it.second == item.itemId }?.first
-                ?: return@setOnMenuItemClickListener false
-            selectModel(model)
-            true
+
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(modelList)
         }
-        popup.show()
+        val createdDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.model_selection_title)
+            .setView(scroll)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog = createdDialog
+        createdDialog.show()
+    }
+
+    private fun modelRowBackground(selected: Boolean): GradientDrawable = GradientDrawable().apply {
+        cornerRadius = dp(14).toFloat()
+        setColor(getColor(if (selected) R.color.setup_accent else R.color.setup_inset))
+        setStroke(
+            dp(1),
+            getColor(if (selected) R.color.setup_accent_soft else R.color.setup_border),
+        )
     }
 
     private fun showLanguageDialog() {
@@ -472,13 +582,13 @@ class MainActivity : android.app.Activity() {
         engine = null
     }
 
-    private fun modelMenuItems(): List<Pair<SttModelProfile, Int>> = listOf(
-        SttModelProfile.ENGLISH_TINY to R.id.menu_model_english_tiny,
-        SttModelProfile.ENGLISH_BASE to R.id.menu_model_english_base,
-        SttModelProfile.ENGLISH_SMALL to R.id.menu_model_english_small,
-        SttModelProfile.MULTILINGUAL_TINY to R.id.menu_model_multilingual_tiny,
-        SttModelProfile.MULTILINGUAL_BASE to R.id.menu_model_multilingual_base,
-        SttModelProfile.MULTILINGUAL_SMALL to R.id.menu_model_multilingual_small,
+    private fun modelMenuModels(): List<SttModelProfile> = listOf(
+        SttModelProfile.ENGLISH_TINY,
+        SttModelProfile.ENGLISH_BASE,
+        SttModelProfile.ENGLISH_SMALL,
+        SttModelProfile.MULTILINGUAL_TINY,
+        SttModelProfile.MULTILINGUAL_BASE,
+        SttModelProfile.MULTILINGUAL_SMALL,
     )
 
     private fun toggleRecording() {

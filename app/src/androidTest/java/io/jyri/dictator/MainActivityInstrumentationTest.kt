@@ -136,7 +136,7 @@ class MainActivityInstrumentationTest {
         enabledView("modelMenu")
         clickView("modelMenu")
         assertNotNull(waitFor(By.textContains("Multilingual")))
-        click(By.textContains("Multilingual"))
+        click(By.descContains("Multilingual"))
         device.waitForIdle()
 
         enabledView("languageMenu")
@@ -150,7 +150,7 @@ class MainActivityInstrumentationTest {
     fun languageListCanBeSearched() {
         enabledView("modelMenu")
         clickView("modelMenu")
-        click(By.textContains("Multilingual"))
+        click(By.descContains("Multilingual"))
         device.waitForIdle()
 
         enabledView("languageMenu")
@@ -173,7 +173,7 @@ class MainActivityInstrumentationTest {
         )
         enabledView("modelMenu")
         clickView("modelMenu")
-        click(By.textContains("Multilingual"))
+        click(By.descContains("Multilingual"))
         device.waitForIdle()
 
         enabledView("languageMenu")

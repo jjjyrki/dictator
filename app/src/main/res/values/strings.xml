@@ -6,14 +6,11 @@
     <string name="accessibility_service_description">Shows a microphone bubble over editable fields and inserts dictated text. Dictator uses accessibility access to find the focused field and insert your words. It does not replace the keyboard.</string>
     <string name="setup_title">Speak naturally. Type instantly.</string>
     <string name="setup_body">Dictator turns your voice into text without sending audio to the cloud. Download a speech model once, enable the dictation bubble, and use it anywhere you can type.</string>
-    <string name="setup_step_model">1  CHOOSE A SPEECH MODEL</string>
-    <string name="model_helper">Smaller models use less storage and respond faster. Larger models may be more accurate.</string>
-    <string name="setup_step_microphone">2  GRANT MICROPHONE ACCESS</string>
-    <string name="setup_step_accessibility">3  TURN ON THE DICTATION BUBBLE</string>
-    <string name="accessibility_helper">Dictator needs accessibility access to find editable fields and insert the words you dictate. Your text is processed on this phone.</string>
-    <string name="setup_step_test">4  TRY A SHORT DICTATION</string>
-    <string name="test_helper">Record a sample here to check your microphone and transcription. Once the bubble is on, you can dictate in any app with a text field.</string>
-    <string name="preferences_title">5  PREFERENCES</string>
+    <string name="setup_step_model">CHOOSE A SPEECH MODEL</string>
+    <string name="setup_step_microphone">GRANT MICROPHONE ACCESS</string>
+    <string name="setup_step_accessibility">TURN ON THE DICTATION BUBBLE</string>
+    <string name="setup_step_test">TRY A SHORT DICTATION</string>
+    <string name="preferences_title">PREFERENCES</string>
     <string name="privacy_footer">Audio and transcripts stay on this device. The only network request is downloading the model you choose.</string>
     <string name="licenses_button">Open-source licenses</string>
     <string name="licenses_title">Open-source licenses</string>
@@ -45,6 +42,7 @@
     <string name="recording_complete">Last test · %1$.1fs audio · %2$.1fs processing</string>
     <string name="sample_metrics_title">Last test</string>
     <string name="sample_metrics_empty">Record a sample to see how long transcription takes.</string>
+    <string name="sample_waveform_description">Live audio level</string>
     <string name="transcript_empty">Your transcript will appear here.</string>
     <string name="no_speech_detected">No speech detected. Try again.</string>
     <string name="mode_replace">Text placement: Replace field</string>

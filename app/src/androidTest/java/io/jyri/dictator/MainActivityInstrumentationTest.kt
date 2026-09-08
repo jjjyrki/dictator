@@ -81,6 +81,7 @@ class MainActivityInstrumentationTest {
             R.id.modelMenu,
             R.id.installModel,
             R.id.record,
+            R.id.sampleWaveform,
             R.id.transcript,
             R.id.sampleMetrics,
             R.id.accessibilityStatus,

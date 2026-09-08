@@ -27,6 +27,11 @@ class WaveChipView(context: Context, attrs: AttributeSet? = null) : View(context
         style = Paint.Style.FILL
     }
 
+    fun setBarColor(color: Int) {
+        barPaint.color = color
+        invalidate()
+    }
+
     fun setActive(value: Boolean) {
         live = value
         if (!live) {

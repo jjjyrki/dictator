@@ -29,6 +29,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import io.jyri.dictator.audio.LiveSttRecorder
 import io.jyri.dictator.insert.InsertMode
+import io.jyri.dictator.overlay.WaveChipView
 import io.jyri.dictator.model.LanguageSelection
 import io.jyri.dictator.model.ModelSelection
 import io.jyri.dictator.model.SpokenLanguage
@@ -54,6 +55,7 @@ class MainActivity : android.app.Activity() {
     private lateinit var recordButton: MaterialButton
     private lateinit var installModelButton: MaterialButton
     private lateinit var modelDownloadProgress: ProgressBar
+    private lateinit var sampleWaveform: WaveChipView
     private lateinit var microphoneStepHeading: View
     private lateinit var microphoneBanner: View
     private lateinit var accessibilityStepHeading: View
@@ -89,6 +91,9 @@ class MainActivity : android.app.Activity() {
         recordButton = findViewById(R.id.record)
         installModelButton = findViewById(R.id.installModel)
         modelDownloadProgress = findViewById(R.id.modelDownloadProgress)
+        sampleWaveform = findViewById<WaveChipView>(R.id.sampleWaveform).apply {
+            setBarColor(getColor(R.color.setup_accent_soft))
+        }
         microphoneStepHeading = findViewById(R.id.microphoneStepHeading)
         microphoneBanner = findViewById(R.id.microphoneBanner)
         accessibilityStepHeading = findViewById(R.id.accessibilityStepHeading)
@@ -163,6 +168,9 @@ class MainActivity : android.app.Activity() {
 
     override fun onDestroy() {
         recorder?.let { active ->
+            active.setLevelListener(null)
+            sampleWaveform.setActive(false)
+            sampleWaveform.visibility = View.GONE
             background.execute { runCatching { active.stopAndFinish() } }
         }
         // The engine stays in SttEngineHolder: the accessibility service
@@ -288,7 +296,6 @@ class MainActivity : android.app.Activity() {
         popup.menuInflater.inflate(R.menu.model_menu, popup.menu)
         modelMenuItems().forEach { (model, itemId) ->
             val item = popup.menu.findItem(itemId)
-            item.isChecked = model == selectedModel
             val installed = SttModelInstaller(this, model.asset).isInstalled()
             item.title = getString(
                 if (installed) R.string.model_menu_installed else R.string.model_menu_not_installed,
@@ -298,7 +305,6 @@ class MainActivity : android.app.Activity() {
         popup.setOnMenuItemClickListener { item ->
             val model = modelMenuItems().firstOrNull { it.second == item.itemId }?.first
                 ?: return@setOnMenuItemClickListener false
-            item.isChecked = true
             selectModel(model)
             true
         }
@@ -495,7 +501,14 @@ class MainActivity : android.app.Activity() {
         transcript.text = ""
         setModelStatus(getString(R.string.recording_starting))
         val active = LiveSttRecorder(checkNotNull(engine))
+        active.setLevelListener { level ->
+            mainHandler.post {
+                if (recorder === active) sampleWaveform.setLevel(level)
+            }
+        }
         recorder = active
+        sampleWaveform.visibility = View.VISIBLE
+        sampleWaveform.setActive(true)
         background.execute {
             runCatching { active.start() }.onSuccess {
                 mainHandler.post {
@@ -504,7 +517,10 @@ class MainActivity : android.app.Activity() {
                 }
             }.onFailure { error ->
                 recorder = null
+                active.setLevelListener(null)
                 mainHandler.post {
+                    sampleWaveform.setActive(false)
+                    sampleWaveform.visibility = View.GONE
                     recordButton.setText(R.string.start_recording)
                     setModelStatus(getString(R.string.model_error, error.message ?: error.javaClass.simpleName))
                     updateModelControls()
@@ -516,6 +532,9 @@ class MainActivity : android.app.Activity() {
     private fun stopRecording(active: LiveSttRecorder) {
         recordButton.isEnabled = false
         recorder = null
+        active.setLevelListener(null)
+        sampleWaveform.setActive(false)
+        sampleWaveform.visibility = View.GONE
         setModelStatus(getString(R.string.finalizing))
         background.execute {
             runCatching { active.stopAndFinish() }.onSuccess { result ->
@@ -627,8 +646,8 @@ class MainActivity : android.app.Activity() {
         val microphoneGranted = hasMicrophonePermission()
         val accessibilityEnabled = isOverlayServiceEnabled()
         val showMicrophoneStep = modelDownloaded && !microphoneGranted
-        val showAccessibilityStep = modelDownloaded && microphoneGranted
-        val showTestStep = showAccessibilityStep && accessibilityEnabled
+        val showAccessibilityStep = modelDownloaded && microphoneGranted && !accessibilityEnabled
+        val showTestStep = modelDownloaded && microphoneGranted && accessibilityEnabled
 
         microphoneStepHeading.visibility =
             if (showMicrophoneStep) View.VISIBLE else View.GONE

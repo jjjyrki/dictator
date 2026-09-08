@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.sqrt
 
 class LiveSttRecorder(
     private val engine: WhisperSttEngine,
@@ -20,9 +21,15 @@ class LiveSttRecorder(
     private val droppedSamples = AtomicLong(0)
     private val inferenceNanos = AtomicLong(0)
     private val failure = AtomicReference<Throwable?>(null)
+    @Volatile
+    private var levelListener: ((Float) -> Unit)? = null
 
     private lateinit var captureThread: Thread
     private lateinit var inferenceThread: Thread
+
+    fun setLevelListener(listener: ((Float) -> Unit)?) {
+        levelListener = listener
+    }
 
     fun start() {
         measureInference { engine.start() }
@@ -82,7 +89,14 @@ class LiveSttRecorder(
                     check(count != AudioRecord.ERROR_INVALID_OPERATION) { "Microphone stopped unexpectedly" }
                     continue
                 }
-                val pcm32 = FloatArray(count) { index -> pcm16[index] / PCM16_SCALE }
+                val pcm32 = FloatArray(count)
+                var sumSquares = 0.0
+                for (index in 0 until count) {
+                    val sample = pcm16[index] / PCM16_SCALE
+                    pcm32[index] = sample
+                    sumSquares += sample.toDouble() * sample.toDouble()
+                }
+                levelListener?.invoke((sqrt(sumSquares / count) * LEVEL_GAIN).toFloat())
                 capturedSamples.addAndGet(count.toLong())
                 if (!frames.offer(pcm32)) droppedSamples.addAndGet(count.toLong())
             }
@@ -135,6 +149,7 @@ class LiveSttRecorder(
         const val MAX_QUEUED_FRAMES = 8
         const val POLL_TIMEOUT_MS = 100L
         const val PCM16_SCALE = 32_768f
+        const val LEVEL_GAIN = 18f
         const val NANOS_PER_SECOND = 1_000_000_000.0
     }
 }

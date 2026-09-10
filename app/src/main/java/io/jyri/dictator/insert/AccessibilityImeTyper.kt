@@ -2,6 +2,7 @@ package io.jyri.dictator.insert
 
 import android.accessibilityservice.InputMethod.AccessibilityInputConnection
 import android.os.Handler
+import io.jyri.dictator.DictationDiagnostics
 import android.os.Looper
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -37,7 +38,11 @@ class AccessibilityImeTyper(
     }
 
     private fun commit(text: String, replaceAll: Boolean): Boolean {
-        val ic = inputConnection() ?: return false
+        val ic = inputConnection()
+        if (ic == null) {
+            DictationDiagnostics.record("ime_connection_unavailable")
+            return false
+        }
         return runCatching {
             if (replaceAll) {
                 ic.performContextMenuAction(android.R.id.selectAll)
@@ -45,7 +50,10 @@ class AccessibilityImeTyper(
             val prefix = if (replaceAll) "" else textBeforeCursor(ic)
             ic.commitText(InsertionText.withSeparator(prefix, text), 1, null)
             true
-        }.getOrDefault(false)
+        }.getOrElse { error ->
+            DictationDiagnostics.record("ime_commit_failed error=${error.javaClass.simpleName}")
+            false
+        }
     }
 
     private fun textBeforeCursor(ic: AccessibilityInputConnection): String {

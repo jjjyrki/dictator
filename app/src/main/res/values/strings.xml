@@ -46,6 +46,9 @@
     <string name="mode_merge">Text placement: Insert at cursor</string>
     <string name="toggle_insert_mode">Change text placement</string>
     <string name="toggle_partials">Live preview</string>
+    <string name="export_diagnostics">Export diagnostics</string>
+    <string name="diagnostics_exported">Diagnostics exported.</string>
+    <string name="diagnostics_export_failed">Could not export diagnostics.</string>
     <string name="partials_on">Live preview: On</string>
     <string name="partials_off">Live preview: Off</string>
     <string name="select_languages">Choose spoken languages</string>

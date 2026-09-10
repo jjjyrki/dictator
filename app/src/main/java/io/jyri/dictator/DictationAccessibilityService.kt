@@ -49,6 +49,7 @@ class DictationAccessibilityService : AccessibilityService() {
     private var controller: DictationSessionController? = null
 
     override fun onServiceConnected() {
+        DictationDiagnostics.initialize(this)
         serviceInfo = serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR
         }
@@ -260,12 +261,17 @@ class DictationAccessibilityService : AccessibilityService() {
      * target window is searched explicitly before giving up.
      */
     private fun currentEditableFocus(expectedWindowId: Int? = null): AccessibilityNodeInfo? {
-        currentEditableFocusIn(rootInActiveWindow)?.let { return it }
+        currentEditableFocusIn(rootInActiveWindow)?.let {
+            return it
+        }
         if (expectedWindowId == null) return null
         for (window in windows) {
             if (window.id != expectedWindowId) continue
-            currentEditableFocusIn(window.root)?.let { return it }
+            currentEditableFocusIn(window.root)?.let {
+                return it
+            }
         }
+        DictationDiagnostics.record("focus_unavailable expectedWindow=$expectedWindowId")
         return null
     }
 

@@ -53,9 +53,14 @@ class BubbleOverlay(
     private var dragStartX = 0
     private var dragStartY = 0
     private val density = view.context.resources.displayMetrics.density
-    private val widthPx = (ROW_WIDTH_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
+    private val expandedWidthPx = (ROW_WIDTH_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
     private val heightPx = (ROW_HEIGHT_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
-    private val position = Position.load(view.context, widthPx)
+    private val paddingPx = ROW_PADDING_DP * density.roundToInt()
+    private val buttonPx = BUTTON_DP * density.roundToInt()
+    // Keep the overlay at its expanded width so resizing the WindowManager window
+    // cannot move the accept button during a collapse animation.
+    private var windowWidthPx = expandedWidthPx
+    private val position = Position.load(view.context, expandedWidthPx, paddingPx, buttonPx)
 
     init {
         // The first visible state is always the idle mic with the extras hidden.
@@ -69,12 +74,15 @@ class BubbleOverlay(
         acceptButton.setOnClickListener { onTap() }
         cancelButton.setOnClickListener { onCancel() }
         row.onDragStart = {
-            dragStartX = position.x
+            dragStartX = position.acceptX
             dragStartY = position.y
             row.alpha = 0.6f
         }
         row.onDrag = { dx, dy ->
-            position.x = (dragStartX + dx.roundToInt()).coerceIn(0, position.maxX)
+            position.acceptX = (dragStartX + dx.roundToInt()).coerceIn(
+                position.minAcceptX,
+                position.maxAcceptX,
+            )
             position.y = (dragStartY + dy.roundToInt()).coerceIn(0, position.maxY)
             windowManager.updateViewLayout(view, layoutParams())
         }
@@ -87,8 +95,8 @@ class BubbleOverlay(
     fun show(state: DictationState) {
         if (!attached) {
             // Attach before starting animations so their first frame is not spent
-            // on a detached view. This also gives hiddenOffsetFor() real layout
-            // coordinates as soon as the first frame is rendered.
+            // on a detached view.
+            windowWidthPx = expandedWidthPx
             windowManager.addView(view, layoutParams())
             attached = true
         }
@@ -126,6 +134,7 @@ class BubbleOverlay(
         waveChipView.setActive(false)
         row.alpha = 1f
         expanded = false
+        windowWidthPx = expandedWidthPx
         lastState = null
         if (attached) {
             windowManager.removeView(view)
@@ -308,6 +317,7 @@ class BubbleOverlay(
                     if (generation != transitionGeneration) return@withEndAction
                     target.visibility = View.GONE
                     target.alpha = 1f
+
                 }
                 .start()
         }
@@ -379,36 +389,36 @@ class BubbleOverlay(
 
     /** Translation that stacks the view on the accept button slot. */
     private fun hiddenOffsetFor(target: View): Float {
-        val paddingPx = ROW_PADDING_DP * density
-        val buttonPx = BUTTON_DP * density
-        val acceptLeft = if (acceptButton.isLaidOut) {
-            acceptButton.left.toFloat()
+        val acceptLeft = (windowWidthPx - paddingPx - buttonPx).toFloat()
+        val slotLeft = if (target.id == R.id.waveChip) {
+            (paddingPx + (BUTTON_DP + MARGIN_DP) * density.roundToInt()).toFloat()
         } else {
-            widthPx - paddingPx - buttonPx
-        }
-        val slotLeft = if (target.isLaidOut) {
-            target.left.toFloat()
-        } else if (target.id == R.id.waveChip) {
-            paddingPx + (BUTTON_DP + MARGIN_DP) * density
-        } else {
-            paddingPx
+            paddingPx.toFloat()
         }
         return acceptLeft - slotLeft
     }
 
     private fun layoutParams(): WindowManager.LayoutParams {
         val metrics = view.context.resources.displayMetrics
-        position.maxX = (metrics.widthPixels - widthPx).coerceAtLeast(0)
+        position.maxAcceptX = (metrics.widthPixels - paddingPx - buttonPx).coerceAtLeast(0)
+        position.minAcceptX = (expandedWidthPx - paddingPx - buttonPx).coerceIn(
+            0,
+            position.maxAcceptX,
+        )
+        position.acceptX = position.acceptX.coerceIn(
+            position.minAcceptX,
+            position.maxAcceptX,
+        )
         position.maxY = (metrics.heightPixels - heightPx).coerceAtLeast(0)
         return WindowManager.LayoutParams().apply {
             type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
             format = PixelFormat.TRANSLUCENT
             flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-            width = widthPx
+            width = windowWidthPx
             height = heightPx
             gravity = Gravity.TOP or Gravity.START
-            x = position.x
+            x = position.acceptX - (windowWidthPx - paddingPx - buttonPx)
             y = position.y
         }
     }
@@ -435,31 +445,51 @@ class BubbleOverlay(
     }
 }
 
+/** Stores the accept button position independently of the current window width. */
 private class Position private constructor(
     private val prefs: android.content.SharedPreferences,
-    var x: Int,
+    var acceptX: Int,
     var y: Int,
 ) {
-    var maxX = Int.MAX_VALUE
+    var minAcceptX = 0
+    var maxAcceptX = Int.MAX_VALUE
     var maxY = Int.MAX_VALUE
 
     fun save() {
-        prefs.edit().putInt(KEY_X, x).putInt(KEY_Y, y).apply()
+        prefs.edit()
+            .putInt(KEY_ACCEPT_X, acceptX)
+            .putInt(KEY_Y, y)
+            .remove(KEY_LEGACY_X)
+            .apply()
     }
 
     companion object {
         private const val PREFS = "bubble_position"
-        private const val KEY_X = "x"
+        private const val KEY_ACCEPT_X = "accept_x"
+        private const val KEY_LEGACY_X = "x"
         private const val KEY_Y = "y"
 
-        fun load(context: android.content.Context, sizePx: Int): Position {
+        fun load(
+            context: android.content.Context,
+            expandedWidthPx: Int,
+            paddingPx: Int,
+            buttonPx: Int,
+        ): Position {
             val stored = context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
             val metrics = context.resources.displayMetrics
-            val defaultX = (metrics.widthPixels - sizePx * 2).coerceAtLeast(0)
+            val expandedAcceptOffset = expandedWidthPx - paddingPx - buttonPx
+            val defaultWindowX = (metrics.widthPixels - expandedWidthPx * 2).coerceAtLeast(0)
+            val defaultAcceptX = defaultWindowX + expandedAcceptOffset
+            val acceptX = if (stored.contains(KEY_ACCEPT_X)) {
+                stored.getInt(KEY_ACCEPT_X, defaultAcceptX)
+            } else {
+                // Before the compact idle window, x stored the expanded window's left edge.
+                stored.getInt(KEY_LEGACY_X, defaultWindowX) + expandedAcceptOffset
+            }
             val defaultY = metrics.heightPixels / 4
             return Position(
                 stored,
-                stored.getInt(KEY_X, defaultX),
+                acceptX,
                 stored.getInt(KEY_Y, defaultY),
             )
         }

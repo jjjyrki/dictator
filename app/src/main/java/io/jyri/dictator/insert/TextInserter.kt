@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import io.jyri.dictator.DictationDiagnostics
 import io.jyri.dictator.focus.EditableTarget
 import io.jyri.dictator.focus.TargetSnapshot
 
@@ -31,6 +32,9 @@ class TextInserter(
         replaceAll: Boolean = false,
     ): InsertionOutcome {
         if (!EditableTarget.matches(expected, node)) {
+            DictationDiagnostics.record(
+                "target_mismatch expected=${DictationDiagnostics.snapshot(expected)}",
+            )
             return clipboardOnly(transcript)
         }
         if (expected.packageName == WHIP_PACKAGE) {
@@ -60,18 +64,29 @@ class TextInserter(
         val setText = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, next)
         }
-        if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, setText)) {
+        val setTextAccepted = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, setText)
+        if (setTextAccepted) {
+            if (!verifyText(node, next)) {
+                DictationDiagnostics.record(
+                    "set_text_unverified expectedLength=${next.length} target=${DictationDiagnostics.snapshot(expected)}",
+                )
+                return if (copy(transcript)) InsertionOutcome.ClipboardFallback else InsertionOutcome.Failed
+            }
             val selection = Bundle().apply {
                 putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, cursor)
                 putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, cursor)
             }
-            node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selection)
+            val selectionAccepted = node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selection)
+            if (!selectionAccepted) DictationDiagnostics.record("selection_rejected")
             return InsertionOutcome.Direct
         }
-        if (paste(node, cleaned)) {
-            return InsertionOutcome.Direct
-        }
-        return if (copy(transcript)) InsertionOutcome.ClipboardFallback else InsertionOutcome.Failed
+        DictationDiagnostics.record(
+            "set_text_rejected target=${DictationDiagnostics.snapshot(expected)}",
+        )
+        val pasted = paste(node, cleaned)
+        if (pasted) return InsertionOutcome.Direct
+        val copied = copy(transcript)
+        return if (copied) InsertionOutcome.ClipboardFallback else InsertionOutcome.Failed
     }
 
     private fun replaceContent(node: AccessibilityNodeInfo, transcript: String): InsertionOutcome {
@@ -80,15 +95,25 @@ class TextInserter(
         val setText = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
         }
-        if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, setText)) {
+        val setTextAccepted = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, setText)
+        if (setTextAccepted) {
+            if (!verifyText(node, text)) {
+                DictationDiagnostics.record(
+                    "replace_unverified expectedLength=${text.length}",
+                )
+                return if (copy(transcript)) InsertionOutcome.ClipboardFallback else InsertionOutcome.Failed
+            }
             val selection = Bundle().apply {
                 putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, text.length)
                 putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, text.length)
             }
-            node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selection)
+            val selectionAccepted = node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selection)
+            if (!selectionAccepted) DictationDiagnostics.record("replace_selection_rejected")
             return InsertionOutcome.Direct
         }
-        return if (copy(transcript)) InsertionOutcome.ClipboardFallback else InsertionOutcome.Failed
+        DictationDiagnostics.record("replace_set_text_rejected")
+        val copied = copy(transcript)
+        return if (copied) InsertionOutcome.ClipboardFallback else InsertionOutcome.Failed
     }
 
     fun copyToClipboard(transcript: String): InsertionOutcome =
@@ -98,6 +123,12 @@ class TextInserter(
 
     private fun paste(node: AccessibilityNodeInfo, transcript: String): Boolean =
         copy(transcript) && node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+
+    private fun verifyText(node: AccessibilityNodeInfo, expected: String): Boolean {
+        val refreshed = node.refresh()
+        val observed = node.actualText()
+        return refreshed && observed == expected
+    }
 
     private fun copy(transcript: String): Boolean {
         val clipboard = clipboardManager ?: return false

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <io.jyri.dictator.overlay.BubbleRowView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/bubbleRow"
-    android:layout_width="232dp"
+    android:layout_width="match_parent"
     android:layout_height="72dp"
     android:clipChildren="false"
     android:clipToPadding="false"

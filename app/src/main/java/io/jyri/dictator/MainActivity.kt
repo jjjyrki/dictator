@@ -78,6 +78,7 @@ class MainActivity : android.app.Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DictationDiagnostics.initialize(this)
         selectedModel = ModelSelection.load(this)
         setContentView(R.layout.activity_main)
         findViewById<View>(R.id.mainContent).applySystemBarInsets()
@@ -113,6 +114,9 @@ class MainActivity : android.app.Activity() {
         }
         findViewById<MaterialButton>(R.id.licenses).setOnClickListener {
             startActivity(Intent(this, LicensesActivity::class.java))
+        }
+        findViewById<MaterialButton>(R.id.exportDiagnostics).setOnClickListener {
+            exportDiagnostics()
         }
         installModelButton.setOnClickListener { installModel() }
         val toggleInsertMode = findViewById<MaterialButton>(R.id.toggleInsertMode)
@@ -663,6 +667,19 @@ class MainActivity : android.app.Activity() {
         }
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_EXPORT_DIAGNOSTICS || resultCode != RESULT_OK) return
+        val destination = data?.data ?: return
+        DictationDiagnostics.export(this, destination) { success ->
+            Toast.makeText(
+                this,
+                if (success) R.string.diagnostics_exported else R.string.diagnostics_export_failed,
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -782,6 +799,17 @@ class MainActivity : android.app.Activity() {
         )
     }
 
+    private fun exportDiagnostics() {
+        startActivityForResult(
+            Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TITLE, "dictator-diagnostics.log")
+            },
+            REQUEST_EXPORT_DIAGNOSTICS,
+        )
+    }
+
     private fun activeLanguages(): Set<SpokenLanguage> =
         LanguageSelection.loadFor(this, selectedModel)
 
@@ -822,6 +850,7 @@ class MainActivity : android.app.Activity() {
         const val EXTRA_REQUEST_MICROPHONE_PERMISSION =
             "io.jyri.dictator.request_microphone_permission"
         private const val REQUEST_RECORD_AUDIO = 1
+        private const val REQUEST_EXPORT_DIAGNOSTICS = 2
         private const val BYTES_PER_MEBIBYTE = 1024L * 1024L
     }
 }

@@ -3,6 +3,7 @@ package io.jyri.dictator.session
 import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityNodeInfo
+import io.jyri.dictator.DictationDiagnostics
 import io.jyri.dictator.focus.EditableTarget
 import io.jyri.dictator.focus.TargetSnapshot
 import io.jyri.dictator.insert.InsertionOutcome
@@ -93,19 +94,35 @@ class DictationSessionController(
         publish(DictationState.Processing)
         background.execute {
             var failureMessage: String? = null
+            var failureType: String? = null
             val transcript = try {
                 active.finish()
             } catch (error: Throwable) {
-                failureMessage = error.message ?: error.javaClass.simpleName
+                failureType = error.javaClass.simpleName
+                failureMessage = error.message ?: failureType
                 null
             }
             val outcome = transcript
-                ?.let { text -> finishTranscript(expected, text) }
+                ?.let { text -> finishTranscript(expected, text, generation) }
                 ?: InsertionOutcome.Failed
             mainHandler.post {
-                if (generation != operationGeneration || state != DictationState.Processing) return@post
+                if (generation != operationGeneration || state != DictationState.Processing) {
+                    DictationDiagnostics.record(
+                        "completion_discarded cycle=$generation currentCycle=$operationGeneration state=$state",
+                    )
+                    return@post
+                }
                 if (outcome == InsertionOutcome.Failed && failureMessage != null) {
+                    DictationDiagnostics.record(
+                        "transcription_failed cycle=$generation error=$failureType",
+                    )
                     onError("Transcription failed: $failureMessage")
+                }
+                if (outcome != InsertionOutcome.Direct) {
+                    DictationDiagnostics.record(
+                        "insertion_outcome cycle=$generation outcome=$outcome " +
+                            "target=${DictationDiagnostics.snapshot(expected)}",
+                    )
                 }
                 completeStop(outcome)
             }
@@ -113,11 +130,18 @@ class DictationSessionController(
     }
 
     /** Returns null when the transcript is empty: an empty result is not a failure. */
-    private fun finishTranscript(expected: TargetSnapshot?, transcript: String): InsertionOutcome? {
+    private fun finishTranscript(
+        expected: TargetSnapshot?,
+        transcript: String,
+        generation: Long,
+    ): InsertionOutcome? {
         if (transcript.isEmpty()) return null
         if (expected == null) return inserter.copyToClipboard(transcript)
         val node = resolveFreshNode(expected)
         return if (node == null) {
+            DictationDiagnostics.record(
+                "target_unavailable cycle=$generation expected=${DictationDiagnostics.snapshot(expected)}",
+            )
             inserter.copyToClipboard(transcript)
         } else {
             inserter.insert(node, expected, transcript, replaceAll())

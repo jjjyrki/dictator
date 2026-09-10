@@ -454,6 +454,20 @@
                     app:cornerRadius="16dp"
                     app:strokeColor="@color/setup_border"
                     app:strokeWidth="1dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/exportDiagnostics"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:minHeight="52dp"
+                    android:text="@string/export_diagnostics"
+                    android:textAllCaps="false"
+                    android:textColor="@color/setup_text"
+                    app:backgroundTint="@color/setup_inset"
+                    app:cornerRadius="16dp"
+                    app:strokeColor="@color/setup_border"
+                    app:strokeWidth="1dp" />
             </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

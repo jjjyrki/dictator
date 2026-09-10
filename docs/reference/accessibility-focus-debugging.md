@@ -2,12 +2,17 @@
 
 Use a debug APK. The bubble already uses `TYPE_ACCESSIBILITY_OVERLAY`.
 
-Enable opt-in node diagnostics:
+The app keeps a bounded, private diagnostic history for insertion problems.
+It records only metadata such as failure type, target package/class, window ID,
+and action outcomes—never transcript, audio, or field text. The history is
+capped at 256 KiB. Use **Export diagnostics** in the Preferences section to
+save it with Android's document picker, then send the exported text file.
 
-```sh
-adb shell setprop log.tag.DictatorFocus DEBUG
-adb logcat -v time -s DictatorFocus:D '*:S'
-```
+Useful events include `target_unavailable`, `set_text_rejected`,
+`set_text_unverified`, `ime_connection_unavailable`, and
+`completion_discarded`. The accessibility-IME API does not return a success
+value from `commitText`, so a call that returns without throwing does not prove
+the editor applied the text.
 
 Focus the ChatGPT composer, then a working field in WhatsApp. Compare event type,
 package/class, source node, input focus, and accessibility focus. Logs include
@@ -24,12 +29,6 @@ A focused node is eligible if it is editable or advertises either text action,
 provided it is visible, enabled, and not a password. Selection-only read-only nodes
 may therefore show the bubble; advertising an action does not guarantee insertion
 will succeed. Existing insertion and clipboard fallbacks still apply.
-
-Disable diagnostics when finished:
-
-```sh
-adb shell setprop log.tag.DictatorFocus INFO
-```
 
 Focus resolution refreshes the input-focus node, then searches at most 128 nodes
 in that window for a usable node carrying actual input focus. The existing

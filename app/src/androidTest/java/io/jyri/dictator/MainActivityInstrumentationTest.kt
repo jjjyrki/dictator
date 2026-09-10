@@ -89,6 +89,7 @@ class MainActivityInstrumentationTest {
             R.id.openAccessibility,
             R.id.toggleInsertMode,
             R.id.togglePartials,
+            R.id.exportDiagnostics,
             R.id.licenses,
         )
         scenario.onActivity { activity ->

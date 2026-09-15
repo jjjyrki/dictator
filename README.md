@@ -1,69 +1,163 @@
+<p align="center">
+  <img src="app/src/main/ic_launcher-playstore.png" alt="Dictator logo" width="160">
+</p>
+
 # Dictator
 
-Dictator is a personal dictation assistant. The Android app puts a microphone bubble above editable fields, transcribes on the device with whisper.cpp and FUTO ACFT models, and inserts the result without replacing the keyboard.
+Dictator turns speech into text on Android and macOS. Transcription runs on the device with whisper.cpp. Audio and transcripts are not sent to a speech service.
 
-There is also a macOS menu-bar port: hold or double-press Fn, transcribe locally with Metal whisper.cpp, and insert into the focused field. See [macos/README.md](macos/README.md) and [TASK-0001](docs/tasks/TASK-0001-macos-dictation-mvp.md).
+This is a sideloaded personal project. It is not published in the Play Store or Mac App Store.
 
-## Start here
+## What it does
 
-- [Product and engineering specification](docs/specifications/00-local-android-dictation-assistant.md)
-- [Documentation guide](docs/README.md)
-- [Specification index](docs/specifications/README.md)
+### Android
 
-## Development order
+Focus a text field and Dictator shows a movable microphone bubble. Tap it, speak, then tap again. Dictator inserts the transcript at the cursor while your normal keyboard stays open.
 
-1. Inspect the existing Moshi Android implementation and the Kyutai STT model.
-2. Build a minimal Android microphone-to-transcript prototype.
-3. Benchmark runtimes and quantization on the target device.
-4. Add the accessibility service, overlay, and text insertion.
-5. Polish only after the core workflow works.
+The bubble shows recording activity and can display a partial transcript. You can insert at the cursor or replace the field. Before insertion, Dictator checks that the original field still has focus. If an app rejects direct insertion, Dictator can fall back to the clipboard.
 
-Android remains the original product path: runtime, then speech, then overlay. The overlay is not the acceptance test until STT on the S23 is good enough. macOS is a parallel personal MVP, not a replacement for that gate.
+Android supports English-only and multilingual FUTO ACFT Whisper models in tiny, base, and small sizes. A multilingual model can listen for up to four selected languages.
 
-## Sideload the STT prototype
+### macOS
 
-Target: Android 14+, `arm64-v8a` on the Galaxy S23. The APK includes the whisper.cpp JNI runtime. It downloads the selected FUTO ACFT Whisper model on first setup; the choices are English-only or multilingual and range from about 43 MB to 264 MB. Models stay in app-private storage and work offline after installation.
+Dictator runs in the menu bar. Hold Fn to record and release it to transcribe and insert. Double-press Fn to keep recording, then press Fn again to stop. A short Fn tap cancels, as does Escape during recording or transcription.
+
+The macOS app supports FUTO ACFT models and the official Whisper `medium-q8_0` and `large-v3-turbo-q8_0` models. whisper.cpp uses Metal on Apple Silicon.
+
+## Requirements
+
+| Platform | Requirements |
+| --- | --- |
+| Android | Android 14 or newer, ARM64 (`arm64-v8a`). Tested on a Samsung Galaxy S23. |
+| macOS | macOS 14 or newer. Apple Silicon is the current development target. |
+
+Models need between tens and hundreds of megabytes of storage. The larger macOS models need about 800 MB.
+
+## Install on Android
+
+You need the Android SDK, ADB, and a connected device with USB or wireless debugging enabled.
+
+Build and install the release APK from the repository root:
 
 ```sh
 export ANDROID_HOME="$HOME/Library/Android/sdk"
-native/build-android.sh
-./gradlew :app:assembleDebug :app:testDebugUnitTest
+./gradlew :app:assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+For a debug build:
+
+```sh
+./gradlew :app:assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`native/build-android.sh` links the JNI library with 16 KB ELF page alignment and verifies its `LOAD` segments, so rebuilt APKs support Android devices using 16 KB pages.
+The current release configuration uses your local Android debug keystore. It is suitable for sideloading, but not for store distribution.
 
-Open Dictator and tap **Model** to choose an English-only or multilingual tiny, base, or small model. For a multilingual model, tap **Select spoken languages** and choose up to four languages from Whisper's supported language list. Select an installed model to load it; for a model marked not installed, choose it first and tap **Download model**. Then record a short sentence. The app shows the transcript and keeps the audio and inference duration in **Last test**. Do not enable or use the overlay as the acceptance test yet.
+### Set up Android
 
-## Run the ADB UI tests
+1. Open Dictator.
+2. Choose and download a speech model.
+3. Grant microphone access.
+4. Open Android Accessibility settings and enable **Dictator dictation bubble**.
+5. Focus a text field in another app.
+6. Tap the bubble to record. Tap it again to transcribe and insert.
 
-The instrumentation suite covers the setup screen, model menu, persisted settings, and the link to Android's Accessibility settings. It does not download a model or make speech assertions, so it is safe to run repeatedly on a connected test device.
+Dictator uses Android Accessibility to find the focused field and insert text. It does not replace your keyboard. Models live in app-private storage and work offline after download.
+
+## Install on macOS
+
+You need Xcode Command Line Tools and CMake.
+
+Build and install from the repository root:
 
 ```sh
-# Build, install, and run every instrumentation test.
+chmod +x native/build-macos.sh macos/build.sh
+macos/build.sh
+open /Applications/Dictator.app
+```
+
+The script builds whisper.cpp with Metal, builds the Swift app, signs it locally, and copies it to `/Applications/Dictator.app`.
+
+Always open `/Applications/Dictator.app`. Do not run `.build/release/Dictator` or `swift run`. macOS ties permissions to the installed app bundle.
+
+### Set up macOS
+
+1. Open `/Applications/Dictator.app`.
+2. Grant microphone access.
+3. Grant Accessibility access to `/Applications/Dictator.app`.
+4. Grant Input Monitoring if macOS requests it.
+5. In Keyboard settings, turn off Apple's Dictation and set Globe/Fn to **Do Nothing** if they conflict with Dictator.
+6. Download and load a model in Dictator settings.
+7. Hold Fn and speak. Release Fn to transcribe and insert.
+
+If Accessibility appears enabled but Dictator cannot use it, remove stale Dictator entries from System Settings and grant access to `/Applications/Dictator.app` again. See [macos/README.md](macos/README.md) for permission troubleshooting.
+
+## Privacy
+
+Dictator records audio only while a dictation session is active. Speech recognition runs locally. The app does not keep a transcript history or intentionally save recordings.
+
+Dictator connects to the network when it downloads a model. It has no accounts, analytics, cloud transcription, or synchronization.
+
+The requested permissions are powerful:
+
+- Microphone access records speech for transcription.
+- Android Accessibility finds editable fields and inserts text.
+- macOS Accessibility finds the focused app and inserts text.
+- macOS Input Monitoring lets Dictator observe Fn or Globe key gestures when required.
+
+Only grant these permissions to a build you trust.
+
+## Limits
+
+- Android requires Android 14 or newer and an ARM64 processor.
+- Some apps hide their editable fields from accessibility or reject inserted text.
+- Recognition speed and accuracy depend on the device and model.
+- Model downloads can use substantial storage.
+- The project does not include store packaging, automatic updates, or production signing.
+
+## Test
+
+Run the Android unit tests and lint checks:
+
+```sh
+./gradlew :app:testDebugUnitTest :app:lintDebug
+```
+
+Run Android instrumentation tests on a connected device:
+
+```sh
 scripts/run-adb-tests.sh
-
-# Run one test class or method.
-scripts/run-adb-tests.sh io.jyri.dictator.MainActivityInstrumentationTest
-scripts/run-adb-tests.sh io.jyri.dictator.MainActivityInstrumentationTest#launchShowsSetupControls
 ```
 
-After installing the APKs, the same runner can be invoked directly:
+Run the macOS tests:
 
 ```sh
-adb shell am instrument -w -r io.jyri.dictator.test/androidx.test.runner.AndroidJUnitRunner
+swift test --package-path macos
 ```
 
-The script leaves app data alone by default. Use `CLEAR_APP_DATA=1 scripts/run-adb-tests.sh` on a disposable device when you need a clean no-model state. The device must run Android 14 or newer. An arm64 device is required if it already has a model installed and the test launches the native Whisper engine.
+The automated tests do not measure speech accuracy. Accessibility, permissions, and insertion behavior still need testing on real devices.
 
-Gradle can run the same suite after a device is connected:
+## Repository layout
 
-```sh
-./gradlew :app:connectedDebugAndroidTest
+```text
+app/       Android app and tests
+macos/     macOS app and Swift tests
+native/    whisper.cpp integration and build scripts
+docs/      specifications, decisions, and task notes
 ```
 
-## Project boundaries
+More documentation:
 
-This is a local tool for one person's devices. It has no accounts, cloud backend, synchronization, analytics, history UI, LLM post-processing, iOS app, or custom keyboard.
+- [Documentation index](docs/README.md)
+- [Android specification](docs/specifications/00-local-android-dictation-assistant.md)
+- [macOS notes and troubleshooting](macos/README.md)
+- [Third-party notices](app/src/main/res/raw/third_party_licenses.txt)
 
-Model weights and generated artifacts do not belong in Git. Store their source, version, checksum, conversion steps, and benchmark results in documentation instead.
+## License
+
+Dictator's original source code is available under the [GNU General Public License version 3 only](LICENSE), identified by SPDX as `GPL-3.0-only`. You may use it commercially, modify it, and redistribute it under the terms of that license. If you distribute a modified version, you must license it under GPLv3 and provide the corresponding source to its recipients.
+
+Third-party libraries and speech-model weights keep their own licenses. Check those terms before redistribution or commercial use.
+
+GPLv3 does not require changes to be submitted to this repository, but pull requests are welcome.

@@ -18,3 +18,6 @@
 
 /native/build-host/
 /native/build-android-arm64/
+/native/build-macos/
+/macos/.build/
+/macos/build/

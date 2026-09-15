@@ -63,7 +63,8 @@
     <string name="model_missing_toast">Download a speech model in Dictator before using the bubble.</string>
     <string name="accessibility_enabled">Dictation bubble is on</string>
     <string name="accessibility_disabled">Dictation bubble is off</string>
-    <string name="open_accessibility_settings">Enable dictation bubble</string>
+    <string name="open_accessibility_settings">Open accessibility settings</string>
+    <string name="enable_accessibility">Enable dictation bubble</string>
     <string name="accessibility_disclosure_title">Allow the dictation bubble?</string>
     <string name="accessibility_disclosure_message">Dictator uses Android’s Accessibility service to find the focused text field, show a microphone bubble, and insert the text you dictate. This lets it work across apps without replacing your keyboard. Dictator does not upload your audio or text.</string>
     <string name="continue_to_accessibility_settings">Continue</string>

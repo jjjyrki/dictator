@@ -31,6 +31,7 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import io.jyri.dictator.audio.LiveSttRecorder
 import io.jyri.dictator.insert.InsertMode
+import io.jyri.dictator.insert.TranscriptNoise
 import io.jyri.dictator.overlay.WaveChipView
 import io.jyri.dictator.model.LanguageSelection
 import io.jyri.dictator.model.ModelSelection
@@ -63,6 +64,7 @@ class MainActivity : android.app.Activity() {
     private lateinit var microphoneBanner: View
     private lateinit var accessibilityStepHeading: View
     private lateinit var accessibilityStep: View
+    private lateinit var accessibilityButton: MaterialButton
     private lateinit var testStepHeading: View
     private lateinit var testStep: View
     private lateinit var preferencesSection: View
@@ -97,6 +99,7 @@ class MainActivity : android.app.Activity() {
         microphoneBanner = findViewById(R.id.microphoneBanner)
         accessibilityStepHeading = findViewById(R.id.accessibilityStepHeading)
         accessibilityStep = findViewById(R.id.accessibilityStep)
+        accessibilityButton = findViewById(R.id.openAccessibility)
         testStepHeading = findViewById(R.id.testStepHeading)
         testStep = findViewById(R.id.testStep)
         preferencesSection = findViewById(R.id.preferencesSection)
@@ -109,8 +112,12 @@ class MainActivity : android.app.Activity() {
 
         modelMenuButton.setOnClickListener { showModelMenu() }
         languageMenuButton.setOnClickListener { showLanguageDialog() }
-        findViewById<MaterialButton>(R.id.openAccessibility).setOnClickListener {
-            showAccessibilityDisclosure()
+        accessibilityButton.setOnClickListener {
+            if (isOverlayServiceEnabled()) {
+                openAccessibilitySettings()
+            } else {
+                showAccessibilityDisclosure()
+            }
         }
         findViewById<MaterialButton>(R.id.licenses).setOnClickListener {
             startActivity(Intent(this, LicensesActivity::class.java))
@@ -648,7 +655,8 @@ class MainActivity : android.app.Activity() {
         background.execute {
             runCatching { active.stopAndFinish() }.onSuccess { result ->
                 mainHandler.post {
-                    transcript.text = result.transcript.ifBlank { getString(R.string.no_speech_detected) }
+                    transcript.text = TranscriptNoise.usableSpeech(result.transcript)
+                        ?: getString(R.string.no_speech_detected)
                     sampleMetrics.text = getString(
                         R.string.recording_complete,
                         result.audioSeconds,
@@ -728,9 +736,13 @@ class MainActivity : android.app.Activity() {
             .setMessage(R.string.accessibility_disclosure_message)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.continue_to_accessibility_settings) { _, _ ->
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                openAccessibilitySettings()
             }
             .show()
+    }
+
+    private fun openAccessibilitySettings() {
+        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
     private fun updateModelControls() {
@@ -773,8 +785,9 @@ class MainActivity : android.app.Activity() {
         val microphoneGranted = hasMicrophonePermission()
         val accessibilityEnabled = isOverlayServiceEnabled()
         val showMicrophoneStep = modelDownloaded && !microphoneGranted
-        val showAccessibilityStep = modelDownloaded && microphoneGranted && !accessibilityEnabled
+        val showAccessibilityStep = shouldShowAccessibilityControls(modelDownloaded, microphoneGranted)
         val showTestStep = modelDownloaded && microphoneGranted && accessibilityEnabled
+        accessibilityButton.setText(accessibilityButtonLabel(accessibilityEnabled))
 
         microphoneStepHeading.visibility =
             if (showMicrophoneStep) View.VISIBLE else View.GONE
@@ -847,6 +860,14 @@ class MainActivity : android.app.Activity() {
     }
 
     companion object {
+        internal fun shouldShowAccessibilityControls(
+            modelDownloaded: Boolean,
+            microphoneGranted: Boolean,
+        ): Boolean = modelDownloaded && microphoneGranted
+
+        internal fun accessibilityButtonLabel(accessibilityEnabled: Boolean): Int =
+            if (accessibilityEnabled) R.string.open_accessibility_settings else R.string.enable_accessibility
+
         const val EXTRA_REQUEST_MICROPHONE_PERMISSION =
             "io.jyri.dictator.request_microphone_permission"
         private const val REQUEST_RECORD_AUDIO = 1

@@ -11,7 +11,7 @@ The documentation records the product boundary, technical decisions, model work,
 - [sherpa-onnx runtime](decisions/2026-09-05-sherpa-onnx-runtime.md) records the superseded Zipformer attempt (fast, inaccurate).
 - [Whisper runtime](decisions/2026-09-05-whisper-runtime.md) records the current whisper.cpp + FUTO ACFT setup.
 - `benchmarks/` will contain reproducible Android performance reports and optional model compatibility fixtures.
-- `tasks/` may contain implementation slices after the feasibility gates in the main specification pass.
+- [Tasks](tasks/README.md) holds implementation slices. The macOS menu-bar MVP is [TASK-0001](tasks/TASK-0001-macos-dictation-mvp.md).
 
 ## Documentation rules
 

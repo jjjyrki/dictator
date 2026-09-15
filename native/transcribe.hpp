@@ -1,9 +1,10 @@
-// Shared dictation transcription logic used by both the Android JNI wrapper
-// and the host compatibility check. It follows FUTO Voice Input's ACFT recipe:
-// greedy sampling with a shortened audio context sized to the clip.
+// Shared dictation transcription logic used by the Android JNI wrapper,
+// the macOS C ABI, and the host compatibility check. Greedy sampling.
+// ACFT models pass shortenAudioContext=true so audio_ctx matches clip length.
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <sstream>
 #include <string>
@@ -11,13 +12,25 @@
 
 #include "whisper.h"
 
+namespace {
+struct TranscribeDeadline {
+    std::chrono::steady_clock::time_point end;
+};
+
+inline bool transcribeTimedOut(void * user) {
+    auto * deadline = static_cast<TranscribeDeadline *>(user);
+    return std::chrono::steady_clock::now() >= deadline->end;
+}
+}
+
 inline std::string transcribeDictation(
     struct whisper_context * context,
     const float * pcm16kMono,
     size_t sampleCount,
     int threads,
     const char * language,
-    const char * allowedLanguages = nullptr
+    const char * allowedLanguages = nullptr,
+    bool shortenAudioContext = true
 ) {
     if (sampleCount == 0) {
         return std::string();
@@ -72,11 +85,26 @@ inline std::string transcribeDictation(
     }
     params.language = lang.c_str();
     params.n_threads = threads;
-    // ACFT models expect the audio context to match the clip length. The same
-    // formula is used by FUTO Voice Input's voiceinput.cpp.
-    params.audio_ctx = static_cast<int>(std::min(
-        1500.0,
-        std::ceil(static_cast<double>(sampleCount) / 320.0) + 32.0));
+    params.no_context = true;
+    params.single_segment = true;
+    params.max_tokens = 256;
+    params.greedy.best_of = 1;
+    // ACFT models expect the audio context to match the clip length. Official
+    // Whisper ggml files were not trained for that and loop on short clips if
+    // audio_ctx is truncated. Leave 0 so whisper.cpp uses the model default.
+    if (shortenAudioContext) {
+        params.audio_ctx = static_cast<int>(std::min(
+            1500.0,
+            std::ceil(static_cast<double>(sampleCount) / 320.0) + 32.0));
+    }
+
+    const int audioSeconds = static_cast<int>(sampleCount / 16000);
+    const int timeoutSeconds = std::max(15, std::min(60, audioSeconds * 8 + 8));
+    TranscribeDeadline deadline{
+        std::chrono::steady_clock::now() + std::chrono::seconds(timeoutSeconds)
+    };
+    params.abort_callback = transcribeTimedOut;
+    params.abort_callback_user_data = &deadline;
 
     if (whisper_full(context, params, pcm16kMono, static_cast<int>(sampleCount)) != 0) {
         return std::string();

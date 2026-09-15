@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>Dictator</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.jyri.dictator.macos</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleDisplayName</key>
+    <string>Dictator</string>
+    <key>CFBundleName</key>
+    <string>Dictator</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Dictator records speech on this Mac and transcribes it locally with Whisper. Audio does not leave the device.</string>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Dictator reads the focused text field so it can insert the transcript, and watches Globe/Fn while Accessibility is granted.</string>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>Dictator watches the Globe/Fn key so hold-to-talk can start without sending keystrokes anywhere else.</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+</dict>
+</plist>

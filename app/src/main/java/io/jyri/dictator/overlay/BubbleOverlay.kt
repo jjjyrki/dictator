@@ -53,13 +53,15 @@ class BubbleOverlay(
     private var dragStartX = 0
     private var dragStartY = 0
     private val density = view.context.resources.displayMetrics.density
+    private val compactWidthPx = (BUTTON_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
     private val expandedWidthPx = (ROW_WIDTH_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
     private val heightPx = (ROW_HEIGHT_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
     private val paddingPx = ROW_PADDING_DP * density.roundToInt()
     private val buttonPx = BUTTON_DP * density.roundToInt()
-    // Keep the overlay at its expanded width so resizing the WindowManager window
-    // cannot move the accept button during a collapse animation.
-    private var windowWidthPx = expandedWidthPx
+    // Idle only needs to cover the mic button. Keeping the window compact is
+    // important: WindowManager routes touches inside the overlay window to it,
+    // even when the view underneath is transparent.
+    private var windowWidthPx = compactWidthPx
     private val position = Position.load(view.context, expandedWidthPx, paddingPx, buttonPx)
 
     init {
@@ -96,7 +98,7 @@ class BubbleOverlay(
         if (!attached) {
             // Attach before starting animations so their first frame is not spent
             // on a detached view.
-            windowWidthPx = expandedWidthPx
+            windowWidthPx = compactWidthPx
             windowManager.addView(view, layoutParams())
             attached = true
         }
@@ -134,7 +136,7 @@ class BubbleOverlay(
         waveChipView.setActive(false)
         row.alpha = 1f
         expanded = false
-        windowWidthPx = expandedWidthPx
+        windowWidthPx = compactWidthPx
         lastState = null
         if (attached) {
             windowManager.removeView(view)
@@ -278,6 +280,7 @@ class BubbleOverlay(
         // A collapse may still be running if the user tapped quickly; take over.
         cancelTransitionAnimations()
         expanded = true
+        resizeWindow(expandedWidthPx)
         cancelButton.visibility = View.VISIBLE
         waveChip.visibility = View.VISIBLE
         // Both start stacked on the accept button, then settle into their slots.
@@ -317,6 +320,7 @@ class BubbleOverlay(
                     if (generation != transitionGeneration) return@withEndAction
                     target.visibility = View.GONE
                     target.alpha = 1f
+                    if (target === cancelButton) resizeWindow(compactWidthPx)
 
                 }
                 .start()
@@ -389,26 +393,31 @@ class BubbleOverlay(
 
     /** Translation that stacks the view on the accept button slot. */
     private fun hiddenOffsetFor(target: View): Float {
-        val acceptLeft = (windowWidthPx - paddingPx - buttonPx).toFloat()
+        // The row expands to the right from the compact mic window. Keeping
+        // the mic at the window's left edge means resizing never changes its
+        // screen position at either end of the animation.
+        val acceptLeft = paddingPx.toFloat()
         val slotLeft = if (target.id == R.id.waveChip) {
             (paddingPx + (BUTTON_DP + MARGIN_DP) * density.roundToInt()).toFloat()
         } else {
-            paddingPx.toFloat()
+            (paddingPx + (2 * BUTTON_DP + 2 * MARGIN_DP) * density.roundToInt()).toFloat()
         }
         return acceptLeft - slotLeft
+    }
+
+    private fun resizeWindow(widthPx: Int) {
+        if (windowWidthPx == widthPx) return
+        windowWidthPx = widthPx
+        if (attached) windowManager.updateViewLayout(view, layoutParams())
     }
 
     private fun layoutParams(): WindowManager.LayoutParams {
         val metrics = view.context.resources.displayMetrics
         position.maxAcceptX = (metrics.widthPixels - paddingPx - buttonPx).coerceAtLeast(0)
-        position.minAcceptX = (expandedWidthPx - paddingPx - buttonPx).coerceIn(
-            0,
-            position.maxAcceptX,
-        )
-        position.acceptX = position.acceptX.coerceIn(
-            position.minAcceptX,
-            position.maxAcceptX,
-        )
+        // The accept button is anchored to the window's left edge in both
+        // compact and expanded layouts, so changing width does not move it.
+        position.minAcceptX = paddingPx
+        position.acceptX = position.acceptX.coerceIn(position.minAcceptX, position.maxAcceptX)
         position.maxY = (metrics.heightPixels - heightPx).coerceAtLeast(0)
         return WindowManager.LayoutParams().apply {
             type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
@@ -418,7 +427,8 @@ class BubbleOverlay(
             width = windowWidthPx
             height = heightPx
             gravity = Gravity.TOP or Gravity.START
-            x = position.acceptX - (windowWidthPx - paddingPx - buttonPx)
+            // Keep the window's left edge fixed while it expands to the right.
+            x = position.acceptX - paddingPx
             y = position.y
         }
     }

@@ -3,6 +3,7 @@ package io.jyri.dictator.speech
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import io.jyri.dictator.insert.TranscriptNoise
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.sqrt
@@ -104,8 +105,8 @@ private class LiveSession(
             // A partial failure must not kill the session; the final
             // transcription at finish is the source of truth.
             val text = runCatching { sharedEngine.transcribe(clip) }.getOrNull() ?: continue
-            val cleaned = text.trim()
-            if (cleaned.isNotEmpty() && cleaned != lastPartial) {
+            val cleaned = TranscriptNoise.usableSpeech(text) ?: continue
+            if (cleaned != lastPartial) {
                 lastPartial = cleaned
                 partialListener?.invoke(cleaned)
             }

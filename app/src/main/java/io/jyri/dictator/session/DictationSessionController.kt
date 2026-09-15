@@ -8,6 +8,7 @@ import io.jyri.dictator.focus.EditableTarget
 import io.jyri.dictator.focus.TargetSnapshot
 import io.jyri.dictator.insert.InsertionOutcome
 import io.jyri.dictator.insert.TextInserter
+import io.jyri.dictator.insert.TranscriptNoise
 import io.jyri.dictator.speech.SpeechEngine
 import io.jyri.dictator.speech.SpeechSession
 import java.util.concurrent.Executor
@@ -79,7 +80,10 @@ class DictationSessionController(
         session = engine.start().also {
             it.setLevelListener(onLevel)
             if (partialsEnabled()) {
-                it.setPartialListener { text -> mainHandler.post { onPartial(text) } }
+                it.setPartialListener { text ->
+                    val speech = TranscriptNoise.usableSpeech(text) ?: return@setPartialListener
+                    mainHandler.post { onPartial(speech) }
+                }
             }
         }
         publish(DictationState.Recording)
@@ -102,9 +106,11 @@ class DictationSessionController(
                 failureMessage = error.message ?: failureType
                 null
             }
-            val outcome = transcript
-                ?.let { text -> finishTranscript(expected, text, generation) }
-                ?: InsertionOutcome.Failed
+            val outcome = if (failureMessage != null) {
+                InsertionOutcome.Failed
+            } else {
+                finishTranscript(expected, transcript.orEmpty(), generation)
+            }
             mainHandler.post {
                 if (generation != operationGeneration || state != DictationState.Processing) {
                     DictationDiagnostics.record(
@@ -135,16 +141,19 @@ class DictationSessionController(
         transcript: String,
         generation: Long,
     ): InsertionOutcome? {
-        if (transcript.isEmpty()) return null
-        if (expected == null) return inserter.copyToClipboard(transcript)
+        val speech = TranscriptNoise.usableSpeech(transcript) ?: run {
+            DictationDiagnostics.record("discarded_noise cycle=$generation")
+            return null
+        }
+        if (expected == null) return inserter.copyToClipboard(speech)
         val node = resolveFreshNode(expected)
         return if (node == null) {
             DictationDiagnostics.record(
                 "target_unavailable cycle=$generation expected=${DictationDiagnostics.snapshot(expected)}",
             )
-            inserter.copyToClipboard(transcript)
+            inserter.copyToClipboard(speech)
         } else {
-            inserter.insert(node, expected, transcript, replaceAll())
+            inserter.insert(node, expected, speech, replaceAll())
         }
     }
 

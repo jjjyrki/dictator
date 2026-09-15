@@ -1,8 +1,8 @@
 # Dictator
 
-Dictator is a personal, sideloaded Android dictation assistant. It puts a small microphone bubble above editable text fields, transcribes speech on the device, and inserts the result without replacing the user's keyboard.
+Dictator is a personal dictation assistant. The Android app puts a microphone bubble above editable fields, transcribes on the device with whisper.cpp and FUTO ACFT models, and inserts the result without replacing the keyboard.
 
-The product question is whether on-device English and Finnish dictation can transcribe faster than real time with good quality on the target Samsung Galaxy S23. The current APK uses the whisper.cpp runtime with a FUTO ACFT fine-tuned Whisper model. The Accessibility overlay remains a separate stub until that test passes.
+There is also a macOS menu-bar port: hold or double-press Fn, transcribe locally with Metal whisper.cpp, and insert into the focused field. See [macos/README.md](macos/README.md) and [TASK-0001](docs/tasks/TASK-0001-macos-dictation-mvp.md).
 
 ## Start here
 
@@ -18,7 +18,7 @@ The product question is whether on-device English and Finnish dictation can tran
 4. Add the accessibility service, overlay, and text insertion.
 5. Polish only after the core workflow works.
 
-The desktop baseline is skipped. The product path is runtime selection, then Android speech, then overlay. The current app contains both the STT spike and the temporary overlay harness, but the harness must not be treated as a product test until STT passes.
+Android remains the original product path: runtime, then speech, then overlay. The overlay is not the acceptance test until STT on the S23 is good enough. macOS is a parallel personal MVP, not a replacement for that gate.
 
 ## Sideload the STT prototype
 
@@ -64,6 +64,6 @@ Gradle can run the same suite after a device is connected:
 
 ## Project boundaries
 
-This is a local tool for one person's device. It has no accounts, cloud backend, synchronization, analytics, history UI, LLM post-processing, iOS app, or custom keyboard.
+This is a local tool for one person's devices. It has no accounts, cloud backend, synchronization, analytics, history UI, LLM post-processing, iOS app, or custom keyboard.
 
 Model weights and generated artifacts do not belong in Git. Store their source, version, checksum, conversion steps, and benchmark results in documentation instead.

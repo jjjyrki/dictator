@@ -3,7 +3,6 @@ package io.jyri.dictator.overlay
 import android.animation.ObjectAnimator
 import android.animation.TimeInterpolator
 import android.animation.ValueAnimator
-import android.annotation.SuppressLint
 import android.graphics.PixelFormat
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -16,13 +15,14 @@ import android.widget.ImageView
 import android.widget.TextView
 import io.jyri.dictator.R
 import io.jyri.dictator.session.DictationState
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
  * Wispr-style bubble: idle shows a round mic; recording morphs the mic into
  * an accept button while cancel and a waveform chip slide out from behind it.
- * The accept button is pinned to the row's right edge and never moves.
+ *
+ * Accept lives in its own overlay window so collapse never resizes it.
+ * Cancel and the waveform use a second window to the left.
  */
 class BubbleOverlay(
     private val windowManager: WindowManager,
@@ -30,17 +30,18 @@ class BubbleOverlay(
     private val onTap: () -> Unit,
     private val onCancel: () -> Unit = {},
 ) {
-    // WindowManager owns this root and supplies its layout parameters in addView.
     @Suppress("InflateParams")
-    private val view: View = inflater.inflate(R.layout.bubble, null)
-    private val row: BubbleRowView = view.findViewById(R.id.bubbleRow)
+    private val view: BubbleRowView = inflater.inflate(R.layout.bubble, null) as BubbleRowView
+    private val row: BubbleRowView = view
     private val acceptButton: FrameLayout = view.findViewById(R.id.acceptButton)
     private val acceptIcon: ImageView = view.findViewById(R.id.acceptIcon)
     private val cancelButton: FrameLayout = view.findViewById(R.id.cancelButton)
     private val waveChip: FrameLayout = view.findViewById(R.id.waveChip)
     private val waveChipView: WaveChipView = view.findViewById(R.id.waveChipView)
     private val partialText: TextView = view.findViewById(R.id.partialText)
+    private val extrasRoot = FrameLayout(view.context)
     private var attached = false
+    private var extrasAttached = false
     private var expanded = false
     private var lastState: DictationState? = null
     private var transitionGeneration = 0L
@@ -50,22 +51,38 @@ class BubbleOverlay(
     private var waveFadeAnimator: ObjectAnimator? = null
     private var processingSpinnerAnimator: ObjectAnimator? = null
     private var idleButtonResetRunnable: Runnable? = null
+    private var expandAfterLayout: Runnable? = null
     private var dragStartX = 0
     private var dragStartY = 0
     private val density = view.context.resources.displayMetrics.density
-    private val compactWidthPx = (BUTTON_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
-    private val expandedWidthPx = (ROW_WIDTH_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
-    private val heightPx = (ROW_HEIGHT_DP + 2 * ROW_PADDING_DP) * density.roundToInt()
-    private val paddingPx = ROW_PADDING_DP * density.roundToInt()
-    private val buttonPx = BUTTON_DP * density.roundToInt()
-    // Idle only needs to cover the mic button. Keeping the window compact is
-    // important: WindowManager routes touches inside the overlay window to it,
-    // even when the view underneath is transparent.
-    private var windowWidthPx = compactWidthPx
+    private val compactWidthPx = dp(BUTTON_DP + 2 * ROW_PADDING_DP)
+    private val expandedWidthPx = dp(ROW_WIDTH_DP + 2 * ROW_PADDING_DP)
+    // Cancel, gap, and waveform at rest. The window is wider so those views
+    // can translate under the accept overlay without hitting a clip edge.
+    private val extrasContentWidthPx = dp(ROW_PADDING_DP + BUTTON_DP + MARGIN_DP + WAVE_DP)
+    private val extrasWindowWidthPx = extrasContentWidthPx + compactWidthPx
+    private val heightPx = dp(ROW_HEIGHT_DP + 2 * ROW_PADDING_DP)
+    private val paddingPx = dp(ROW_PADDING_DP)
+    private val buttonPx = dp(BUTTON_DP)
+    private val waveSlotLeftPx = paddingPx + dp(BUTTON_DP + MARGIN_DP)
     private val position = Position.load(view.context, expandedWidthPx, paddingPx, buttonPx)
 
     init {
-        // The first visible state is always the idle mic with the extras hidden.
+        val cancelLp = cancelButton.layoutParams
+        val waveLp = waveChip.layoutParams
+        view.removeView(cancelButton)
+        view.removeView(waveChip)
+        extrasRoot.clipChildren = false
+        extrasRoot.clipToPadding = false
+        extrasRoot.elevation = 0f
+        extrasRoot.setPadding(paddingPx, paddingPx, 0, paddingPx)
+        acceptButton.elevation = 4f
+        extrasRoot.addView(cancelButton, cancelLp)
+        extrasRoot.addView(waveChip, waveLp)
+        acceptButton.layoutParams = FrameLayout.LayoutParams(buttonPx, buttonPx).apply {
+            gravity = Gravity.CENTER
+        }
+
         expanded = false
         cancelButton.visibility = View.GONE
         waveChip.visibility = View.GONE
@@ -79,6 +96,7 @@ class BubbleOverlay(
             dragStartX = position.acceptX
             dragStartY = position.y
             row.alpha = 0.6f
+            extrasRoot.alpha = 0.6f
         }
         row.onDrag = { dx, dy ->
             position.acceptX = (dragStartX + dx.roundToInt()).coerceIn(
@@ -86,20 +104,19 @@ class BubbleOverlay(
                 position.maxAcceptX,
             )
             position.y = (dragStartY + dy.roundToInt()).coerceIn(0, position.maxY)
-            windowManager.updateViewLayout(view, layoutParams())
+            if (attached) windowManager.updateViewLayout(view, acceptLayoutParams())
+            if (extrasAttached) windowManager.updateViewLayout(extrasRoot, extrasLayoutParams())
         }
         row.onDragEnd = {
             row.alpha = 1f
+            extrasRoot.alpha = 1f
             position.save()
         }
     }
 
     fun show(state: DictationState) {
         if (!attached) {
-            // Attach before starting animations so their first frame is not spent
-            // on a detached view.
-            windowWidthPx = compactWidthPx
-            windowManager.addView(view, layoutParams())
+            windowManager.addView(view, acceptLayoutParams())
             attached = true
         }
         if (state != lastState) bind(state)
@@ -115,12 +132,11 @@ class BubbleOverlay(
     }
 
     fun hide() {
-        // removeView() does not stop property animators or posted callbacks.
-        // Reset the reusable view before detaching it so a later show starts
-        // from a deterministic idle layout.
         cancelTransitionAnimations()
         idleButtonResetRunnable?.let { view.removeCallbacks(it) }
         idleButtonResetRunnable = null
+        expandAfterLayout?.let { view.removeCallbacks(it) }
+        expandAfterLayout = null
         stopProcessingSpinner()
         acceptButton.animate().cancel()
         acceptButton.scaleX = 1f
@@ -135,9 +151,10 @@ class BubbleOverlay(
         waveChip.translationX = 0f
         waveChipView.setActive(false)
         row.alpha = 1f
+        extrasRoot.alpha = 1f
         expanded = false
-        windowWidthPx = compactWidthPx
         lastState = null
+        detachExtras()
         if (attached) {
             windowManager.removeView(view)
             attached = false
@@ -277,13 +294,21 @@ class BubbleOverlay(
     /** Slides cancel and the waveform chip out from behind the accept button. */
     private fun expand() {
         if (expanded) return
-        // A collapse may still be running if the user tapped quickly; take over.
         cancelTransitionAnimations()
         expanded = true
-        resizeWindow(expandedWidthPx)
+        attachExtras()
+        val generation = transitionGeneration
+        expandAfterLayout?.let { view.removeCallbacks(it) }
+        expandAfterLayout = Runnable {
+            expandAfterLayout = null
+            if (generation != transitionGeneration || !expanded || !attached) return@Runnable
+            startExpandMotion()
+        }.also { extrasRoot.post(it) }
+    }
+
+    private fun startExpandMotion() {
         cancelButton.visibility = View.VISIBLE
         waveChip.visibility = View.VISIBLE
-        // Both start stacked on the accept button, then settle into their slots.
         cancelButton.translationX = hiddenOffsetFor(cancelButton)
         waveChip.translationX = hiddenOffsetFor(waveChip)
         cancelButton.alpha = 0f
@@ -311,6 +336,7 @@ class BubbleOverlay(
         expanded = false
         waveChipView.setActive(false)
         val generation = cancelTransitionAnimations()
+        if (!extrasAttached) return
         val interpolator = PathInterpolator(0.4f, 0f, 1f, 1f)
         val hide = { target: View, durationMs: Long ->
             val hidden = hiddenOffsetFor(target)
@@ -320,12 +346,10 @@ class BubbleOverlay(
                     if (generation != transitionGeneration) return@withEndAction
                     target.visibility = View.GONE
                     target.alpha = 1f
-                    if (target === cancelButton) resizeWindow(compactWidthPx)
-
+                    if (target === cancelButton) detachExtras()
                 }
                 .start()
         }
-        // The waveform lingers a beat shorter; cancel drifts out last and slowest.
         hide(waveChip, WAVE_OUT_MS)
         hide(cancelButton, CANCEL_OUT_MS)
         animateExtraScale(waveChip, EXTRA_MIN_SCALE_Y, WAVE_OUT_MS / 2)
@@ -336,9 +360,12 @@ class BubbleOverlay(
 
     /** Cancels every animation that can mutate the extra controls. */
     private fun cancelTransitionAnimations(): Long {
-        // Invalidate callbacks before cancelling: ViewPropertyAnimator can still
-        // deliver an end callback after cancel() on some Android releases.
         transitionGeneration++
+        expandAfterLayout?.let {
+            view.removeCallbacks(it)
+            extrasRoot.removeCallbacks(it)
+        }
+        expandAfterLayout = null
         cancelButton.animate().cancel()
         waveChip.animate().cancel()
         cancelScaleAnimator?.cancel()
@@ -393,44 +420,68 @@ class BubbleOverlay(
 
     /** Translation that stacks the view on the accept button slot. */
     private fun hiddenOffsetFor(target: View): Float {
-        // The row expands to the right from the compact mic window. Keeping
-        // the mic at the window's left edge means resizing never changes its
-        // screen position at either end of the animation.
-        val acceptLeft = paddingPx.toFloat()
+        val acceptLeft = (extrasContentWidthPx + paddingPx).toFloat()
         val slotLeft = if (target.id == R.id.waveChip) {
-            (paddingPx + (BUTTON_DP + MARGIN_DP) * density.roundToInt()).toFloat()
+            waveSlotLeftPx.toFloat()
         } else {
-            (paddingPx + (2 * BUTTON_DP + 2 * MARGIN_DP) * density.roundToInt()).toFloat()
+            paddingPx.toFloat()
         }
         return acceptLeft - slotLeft
     }
 
-    private fun resizeWindow(widthPx: Int) {
-        if (windowWidthPx == widthPx) return
-        windowWidthPx = widthPx
-        if (attached) windowManager.updateViewLayout(view, layoutParams())
+    private fun dp(value: Int): Int = (value * density).roundToInt()
+
+    private fun attachExtras() {
+        if (extrasAttached || !attached) return
+        windowManager.addView(extrasRoot, extrasLayoutParams())
+        extrasAttached = true
+        restackAcceptOnTop()
     }
 
-    private fun layoutParams(): WindowManager.LayoutParams {
-        val metrics = view.context.resources.displayMetrics
-        position.maxAcceptX = (metrics.widthPixels - paddingPx - buttonPx).coerceAtLeast(0)
-        // The accept button is anchored to the window's left edge in both
-        // compact and expanded layouts, so changing width does not move it.
-        position.minAcceptX = paddingPx
-        position.acceptX = position.acceptX.coerceIn(position.minAcceptX, position.maxAcceptX)
-        position.maxY = (metrics.heightPixels - heightPx).coerceAtLeast(0)
+    /** Later overlay windows sit above earlier ones; keep the hero tappable. */
+    private fun restackAcceptOnTop() {
+        if (!attached) return
+        windowManager.removeView(view)
+        windowManager.addView(view, acceptLayoutParams())
+    }
+
+    private fun detachExtras() {
+        if (!extrasAttached) return
+        windowManager.removeView(extrasRoot)
+        extrasAttached = false
+    }
+
+    private fun overlayParams(widthPx: Int, x: Int): WindowManager.LayoutParams {
+        refreshPositionBounds()
         return WindowManager.LayoutParams().apply {
             type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
             format = PixelFormat.TRANSLUCENT
             flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-            width = windowWidthPx
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            windowAnimations = 0
+            width = widthPx
             height = heightPx
             gravity = Gravity.TOP or Gravity.START
-            // Keep the window's left edge fixed while it expands to the right.
-            x = position.acceptX - paddingPx
+            this.x = x
             y = position.y
         }
+    }
+
+    private fun acceptLayoutParams(): WindowManager.LayoutParams =
+        overlayParams(compactWidthPx, position.acceptX - paddingPx)
+
+    private fun extrasLayoutParams(): WindowManager.LayoutParams {
+        val acceptWindowX = position.acceptX - paddingPx
+        return overlayParams(extrasWindowWidthPx, acceptWindowX - extrasContentWidthPx)
+    }
+
+    private fun refreshPositionBounds() {
+        val metrics = view.context.resources.displayMetrics
+        position.maxAcceptX = (metrics.widthPixels - paddingPx - buttonPx).coerceAtLeast(0)
+        position.minAcceptX = 0
+        position.acceptX = position.acceptX.coerceIn(0, position.maxAcceptX)
+        position.maxY = (metrics.heightPixels - heightPx).coerceAtLeast(0)
     }
 
     private companion object {
@@ -438,6 +489,7 @@ class BubbleOverlay(
         const val ROW_HEIGHT_DP = 52
         const val ROW_PADDING_DP = 10
         const val BUTTON_DP = 52
+        const val WAVE_DP = 92
         const val MARGIN_DP = 8
         const val STANDARD_ICON_DP = 22
         const val DICTATOR_ICON_DP = 30
@@ -493,7 +545,6 @@ private class Position private constructor(
             val acceptX = if (stored.contains(KEY_ACCEPT_X)) {
                 stored.getInt(KEY_ACCEPT_X, defaultAcceptX)
             } else {
-                // Before the compact idle window, x stored the expanded window's left edge.
                 stored.getInt(KEY_LEGACY_X, defaultWindowX) + expandedAcceptOffset
             }
             val defaultY = metrics.heightPixels / 4

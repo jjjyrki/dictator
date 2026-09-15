@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "dictator"
 include(":app")
+project(":app").projectDir = file("android/app")

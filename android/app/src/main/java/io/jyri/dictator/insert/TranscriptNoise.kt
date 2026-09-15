@@ -19,6 +19,7 @@ object TranscriptNoise {
         "HUMMING",
         "SINGING",
         "STATIC",
+        "TYPING",
         "BLANK",
     )
 

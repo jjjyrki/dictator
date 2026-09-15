@@ -17,7 +17,7 @@ if [[ ! -d "$NDK_ROOT" ]]; then
   exit 1
 fi
 
-JNI_LIBS="$ROOT/app/src/main/jniLibs/arm64-v8a"
+JNI_LIBS="$ROOT/android/app/src/main/jniLibs/arm64-v8a"
 BUILD_DIR="$ROOT/native/build-android-arm64"
 
 cmake -S "$ROOT/native" -B "$BUILD_DIR" \

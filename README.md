@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/src/main/ic_launcher-playstore.png" alt="Dictator logo" width="160">
+  <img src="android/app/src/main/ic_launcher-playstore.png" alt="Dictator logo" width="160">
 </p>
 
 # Dictator
@@ -42,14 +42,14 @@ Build and install the release APK from the repository root:
 ```sh
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 ./gradlew :app:assembleRelease
-adb install -r app/build/outputs/apk/release/app-release.apk
+adb install -r android/app/build/outputs/apk/release/app-release.apk
 ```
 
 For a debug build:
 
 ```sh
 ./gradlew :app:assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 The current release configuration uses your local Android debug keystore. It is suitable for sideloading, but not for store distribution.
@@ -141,7 +141,7 @@ The automated tests do not measure speech accuracy. Accessibility, permissions, 
 ## Repository layout
 
 ```text
-app/       Android app and tests
+android/app/  Android app and tests
 macos/     macOS app and Swift tests
 native/    whisper.cpp integration and build scripts
 docs/      specifications, decisions, and task notes
@@ -152,7 +152,7 @@ More documentation:
 - [Documentation index](docs/README.md)
 - [Android specification](docs/specifications/00-local-android-dictation-assistant.md)
 - [macOS notes and troubleshooting](macos/README.md)
-- [Third-party notices](app/src/main/res/raw/third_party_licenses.txt)
+- [Third-party notices](android/app/src/main/res/raw/third_party_licenses.txt)
 
 ## License
 

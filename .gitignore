@@ -1,6 +1,6 @@
 /.gradle/
 /build/
-/app/build/
+/android/app/build/
 /native/target/
 /local.properties
 /.idea/

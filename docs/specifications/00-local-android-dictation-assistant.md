@@ -15,7 +15,7 @@ This is a sideloaded application for one device. It does not need accounts, a cl
 
 The project starts with speech inference, not Android polish. The first technical gate is live, English, on-device transcription with Kyutai's `stt-1b-en_fr` model at faster than real-time speed on the target phone.
 
-There is a temporary sideload shortcut in `app/`: an Accessibility overlay that inserts canned text. It exists so the bubble and insertion path can be tried on a phone before STT is ready. It does not satisfy the RTF gate. See `docs/decisions/2026-09-04-overlay-stub.md`.
+There is a temporary sideload shortcut in `android/app/`: an Accessibility overlay that inserts canned text. It exists so the bubble and insertion path can be tried on a phone before STT is ready. It does not satisfy the RTF gate. See `docs/decisions/2026-09-04-overlay-stub.md`.
 
 ## 2. Goals
 
@@ -648,7 +648,7 @@ Each addition needs a clear reason and a regression test. The project should rem
 The planned layout is:
 
 ```text
-app/
+android/app/
   Android application, Activity, services, permissions, and Android-facing integration
 speech/
   Stable Android-facing speech API and session types

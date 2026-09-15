@@ -16,6 +16,7 @@ public enum TranscriptNoise {
         "HUMMING",
         "SINGING",
         "STATIC",
+        "TYPING",
         "BLANK",
     ]
 

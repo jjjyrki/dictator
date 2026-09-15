@@ -20,6 +20,12 @@ class TranscriptNoiseTest {
     }
 
     @Test
+    fun discardsTypingTag() {
+        assertNull(TranscriptNoise.usableSpeech("(typing)"))
+        assertNull(TranscriptNoise.usableSpeech("[TYPING]"))
+    }
+
+    @Test
     fun keepsRealSpeech() {
         assertEquals("Hello there.", TranscriptNoise.usableSpeech(" Hello there. "))
     }

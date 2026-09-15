@@ -14,6 +14,11 @@ final class TranscriptNoiseTests: XCTestCase {
         XCTAssertNil(TranscriptNoise.usableSpeech("♪"))
     }
 
+    func testDiscardsTypingTag() {
+        XCTAssertNil(TranscriptNoise.usableSpeech("(typing)"))
+        XCTAssertNil(TranscriptNoise.usableSpeech("[TYPING]"))
+    }
+
     func testKeepsRealSpeech() {
         XCTAssertEqual(TranscriptNoise.usableSpeech(" Hello there. "), "Hello there.")
     }

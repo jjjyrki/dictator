@@ -24,8 +24,8 @@ if [[ "${CLEAR_APP_DATA:-0}" == "1" ]]; then
 fi
 
 ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest
-"$ADB_BIN" install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null
-"$ADB_BIN" install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
+"$ADB_BIN" install -r android/app/build/outputs/apk/debug/app-debug.apk >/dev/null
+"$ADB_BIN" install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk >/dev/null
 
 runner="$($ADB_BIN shell pm list instrumentation | tr -d '\r' | awk -v package="$TEST_ID" '$1 ~ "^instrumentation:" package "/" { sub(/^instrumentation:/, "", $1); print $1; exit }')"
 if [[ -z "$runner" ]]; then
